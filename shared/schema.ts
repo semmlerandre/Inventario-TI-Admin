@@ -14,6 +14,8 @@ export const settings = pgTable("settings", {
   logoUrl: text("logo_url"),
   primaryColor: text("primary_color").default("#0ea5e9"),
   appName: text("app_name").default("TI Inventory"),
+  alertEmail: text("alert_email"),
+  alertStockLevel: integer("alert_stock_level").default(5),
 });
 
 export const items = pgTable("items", {
@@ -22,6 +24,7 @@ export const items = pgTable("items", {
   category: text("category").notNull(),
   stock: integer("stock").notNull().default(0),
   minStock: integer("min_stock").notNull().default(5),
+  currentHolder: text("current_holder"), // Quem está utilizando
   createdAt: timestamp("created_at").defaultNow(),
 });
 

@@ -3,8 +3,9 @@ import { useTransactions } from "@/hooks/use-transactions";
 import { Card } from "@/components/ui/card";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { ArrowDownToLine, ArrowUpToLine, History } from "lucide-react";
+import { ArrowDownToLine, ArrowUpToLine, History, Download } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 
 export default function TransactionsPage() {
   const { data: transactions = [], isLoading } = useTransactions();
@@ -17,9 +18,14 @@ export default function TransactionsPage() {
   return (
     <AppLayout>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-display font-bold text-slate-900">Histórico de Movimentações</h1>
-          <p className="text-slate-500 mt-1">Acompanhe o registro de entradas e saídas do estoque.</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-display font-bold text-slate-900">Histórico de Movimentações</h1>
+            <p className="text-slate-500 mt-1">Acompanhe o registro de entradas e saídas do estoque.</p>
+          </div>
+          <Button variant="outline" onClick={() => window.print()}>
+            <Download className="w-4 h-4 mr-2" /> Exportar PDF
+          </Button>
         </div>
 
         <Card className="border-none shadow-md shadow-slate-200/50 overflow-hidden">

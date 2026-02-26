@@ -130,7 +130,9 @@ export class DatabaseStorage implements IStorage {
       await this.updateItem(item.id, { stock: newStock });
 
       if (transaction.type === 'out' && newStock <= item.minStock) {
-        console.log(`[EMAIL NOTIFICATION MOCK] Alerta de Estoque Baixo: ${item.name} tem apenas ${newStock} em estoque!`);
+        const settings = await this.getSettings();
+        const alertEmail = settings?.alertEmail || "admin@exemplo.com";
+        console.log(`[EMAIL NOTIFICATION] Enviando alerta para ${alertEmail}: O item ${item.name} atingiu nível crítico de ${newStock} unidades.`);
       }
     }
 

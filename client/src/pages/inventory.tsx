@@ -2,7 +2,7 @@ import { useState } from "react";
 import { AppLayout } from "@/components/layout/app-layout";
 import { useItems, useCreateItem, useUpdateItem, useDeleteItem } from "@/hooks/use-items";
 import { useCreateTransaction } from "@/hooks/use-transactions";
-import { Plus, Search, MoreVertical, Edit2, Trash2, ArrowDownToLine, ArrowUpToLine, AlertCircle } from "lucide-react";
+import { Plus, Search, MoreVertical, Edit2, Trash2, ArrowDownToLine, ArrowUpToLine, AlertCircle, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -49,27 +49,35 @@ export default function InventoryPage() {
 
   const filteredItems = items.filter(item => 
     item.name.toLowerCase().includes(search.toLowerCase()) || 
-    item.category.toLowerCase().includes(search.toLowerCase())
+    item.category.toLowerCase().includes(search.toLowerCase()) ||
+    (item.currentHolder && item.currentHolder.toLowerCase().includes(search.toLowerCase()))
   );
 
   // --- ITEM FORM ---
   const itemForm = useForm<z.infer<typeof api.items.create.input>>({
     resolver: zodResolver(api.items.create.input.extend({
       stock: z.coerce.number().min(0),
-      minStock: z.coerce.number().min(0)
+      minStock: z.coerce.number().min(0),
+      currentHolder: z.string().optional()
     })),
-    defaultValues: { name: "", category: "", stock: 0, minStock: 5 },
+    defaultValues: { name: "", category: "", stock: 0, minStock: 5, currentHolder: "" },
   });
 
   const openCreateItem = () => {
     setEditingItem(null);
-    itemForm.reset({ name: "", category: "", stock: 0, minStock: 5 });
+    itemForm.reset({ name: "", category: "", stock: 0, minStock: 5, currentHolder: "" });
     setIsItemDialogOpen(true);
   };
 
   const openEditItem = (item: Item) => {
     setEditingItem(item);
-    itemForm.reset({ name: item.name, category: item.category, stock: item.stock, minStock: item.minStock });
+    itemForm.reset({ 
+      name: item.name, 
+      category: item.category, 
+      stock: item.stock, 
+      minStock: item.minStock,
+      currentHolder: item.currentHolder || "" 
+    });
     setIsItemDialogOpen(true);
   };
 
@@ -128,15 +136,20 @@ export default function InventoryPage() {
         </div>
 
         <Card className="border-none shadow-md shadow-slate-200/50">
-          <div className="p-4 border-b border-slate-100 flex items-center">
+          <div className="p-4 border-b border-slate-100 flex items-center justify-between">
             <div className="relative w-full max-w-md">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
               <Input 
-                placeholder="Buscar por nome ou categoria..." 
+                placeholder="Buscar por nome, categoria ou usuário..." 
                 className="pl-9 bg-slate-50 border-transparent focus:bg-white rounded-lg h-10"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={() => window.print()} className="hidden md:flex">
+                <Download className="w-4 h-4 mr-2" /> PDF / Relatório
+              </Button>
             </div>
           </div>
           
@@ -146,6 +159,7 @@ export default function InventoryPage() {
                 <tr>
                   <th className="px-6 py-4 font-semibold">Nome do Item</th>
                   <th className="px-6 py-4 font-semibold">Categoria</th>
+                  <th className="px-6 py-4 font-semibold">Usuário Atual</th>
                   <th className="px-6 py-4 font-semibold text-right">Estoque Atual</th>
                   <th className="px-6 py-4 font-semibold text-center">Status</th>
                   <th className="px-6 py-4 text-right">Ações</th>
@@ -161,6 +175,7 @@ export default function InventoryPage() {
                     <tr key={item.id} className="hover:bg-slate-50/80 transition-colors group">
                       <td className="px-6 py-4 font-medium text-slate-900">{item.name}</td>
                       <td className="px-6 py-4 text-slate-500">{item.category}</td>
+                      <td className="px-6 py-4 text-slate-500 italic">{item.currentHolder || '-'}</td>
                       <td className="px-6 py-4 text-right font-display font-semibold text-slate-700">
                         {item.stock}
                       </td>
@@ -222,6 +237,13 @@ export default function InventoryPage() {
                 )} />
                 <FormField control={itemForm.control} name="category" render={({ field }) => (
                   <FormItem><FormLabel>Categoria</FormLabel><FormControl><Input placeholder="Ex: Mouses" {...field} /></FormControl><FormMessage /></FormItem>
+                )} />
+                <FormField control={itemForm.control} name="currentHolder" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Usuário Atual (Quem está com o item)</FormLabel>
+                    <FormControl><Input placeholder="Ex: Depto Financeiro / João" {...field} value={field.value || ''} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
                 )} />
                 <div className="grid grid-cols-2 gap-4">
                   <FormField control={itemForm.control} name="stock" render={({ field }) => (

@@ -108,6 +108,22 @@ export default function SettingsPage() {
                       <FormMessage />
                     </FormItem>
                   )} />
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <FormField control={settingsForm.control} name="alertEmail" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>E-mail para Alertas</FormLabel>
+                        <FormControl><Input placeholder="admin@exemplo.com" {...field} value={field.value || ''} /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                    <FormField control={settingsForm.control} name="alertStockLevel" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Nível Global de Alerta</FormLabel>
+                        <FormControl><Input type="number" {...field} value={field.value || 5} onChange={e => field.onChange(parseInt(e.target.value))} /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                  </div>
                   <FormField control={settingsForm.control} name="primaryColor" render={({ field }) => (
                     <FormItem>
                       <FormLabel>Cor Principal</FormLabel>
