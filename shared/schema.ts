@@ -16,6 +16,12 @@ export const settings = pgTable("settings", {
   appName: text("app_name").default("TI Inventory"),
   alertEmail: text("alert_email"),
   alertStockLevel: integer("alert_stock_level").default(5),
+  smtpHost: text("smtp_host"),
+  smtpPort: integer("smtp_port"),
+  smtpUser: text("smtp_user"),
+  smtpPass: text("smtp_pass"),
+  webhookTeams: text("webhook_teams"),
+  webhookSlack: text("webhook_slack"),
 });
 
 export const items = pgTable("items", {

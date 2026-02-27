@@ -133,6 +133,14 @@ export class DatabaseStorage implements IStorage {
         const settings = await this.getSettings();
         const alertEmail = settings?.alertEmail || "admin@exemplo.com";
         console.log(`[EMAIL NOTIFICATION] Enviando alerta para ${alertEmail}: O item ${item.name} atingiu nível crítico de ${newStock} unidades.`);
+
+        // Mock integration with Teams/Slack
+        if (settings?.webhookTeams) {
+          console.log(`[TEAMS NOTIFICATION] Enviando para ${settings.webhookTeams}: Estoque baixo para ${item.name}`);
+        }
+        if (settings?.webhookSlack) {
+          console.log(`[SLACK NOTIFICATION] Enviando para ${settings.webhookSlack}: Estoque baixo para ${item.name}`);
+        }
       }
     }
 

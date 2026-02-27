@@ -124,6 +124,41 @@ export default function SettingsPage() {
                       </FormItem>
                     )} />
                   </div>
+
+                  <div className="space-y-4 pt-4 border-t border-slate-100">
+                    <h3 className="text-sm font-semibold flex items-center gap-2">
+                      <Shield className="h-4 w-4" /> Configurações de E-mail (SMTP)
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <FormField control={settingsForm.control} name="smtpHost" render={({ field }) => (
+                        <FormItem><FormLabel>Host SMTP</FormLabel><FormControl><Input placeholder="smtp.gmail.com" {...field} value={field.value || ''} /></FormControl></FormItem>
+                      )} />
+                      <FormField control={settingsForm.control} name="smtpPort" render={({ field }) => (
+                        <FormItem><FormLabel>Porta</FormLabel><FormControl><Input type="number" {...field} value={field.value || 587} onChange={e => field.onChange(parseInt(e.target.value))} /></FormControl></FormItem>
+                      )} />
+                      <FormField control={settingsForm.control} name="smtpUser" render={({ field }) => (
+                        <FormItem><FormLabel>Usuário</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl></FormItem>
+                      )} />
+                      <FormField control={settingsForm.control} name="smtpPass" render={({ field }) => (
+                        <FormItem><FormLabel>Senha</FormLabel><FormControl><Input type="password" {...field} value={field.value || ''} /></FormControl></FormItem>
+                      )} />
+                    </div>
+                  </div>
+
+                  <div className="space-y-4 pt-4 border-t border-slate-100">
+                    <h3 className="text-sm font-semibold flex items-center gap-2">
+                      <Palette className="h-4 w-4" /> Integrações (Webhooks)
+                    </h3>
+                    <div className="space-y-4">
+                      <FormField control={settingsForm.control} name="webhookTeams" render={({ field }) => (
+                        <FormItem><FormLabel>Webhook Microsoft Teams</FormLabel><FormControl><Input placeholder="https://outlook.office.com/webhook/..." {...field} value={field.value || ''} /></FormControl></FormItem>
+                      )} />
+                      <FormField control={settingsForm.control} name="webhookSlack" render={({ field }) => (
+                        <FormItem><FormLabel>Webhook Slack</FormLabel><FormControl><Input placeholder="https://hooks.slack.com/services/..." {...field} value={field.value || ''} /></FormControl></FormItem>
+                      )} />
+                    </div>
+                  </div>
+
                   <FormField control={settingsForm.control} name="primaryColor" render={({ field }) => (
                     <FormItem>
                       <FormLabel>Cor Principal</FormLabel>
