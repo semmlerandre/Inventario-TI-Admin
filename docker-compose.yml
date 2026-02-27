@@ -2,12 +2,11 @@ services:
   app:
     build: .
     ports:
-      - "7000:7000"
+      - "5000:5000"
     environment:
       - DATABASE_URL=postgres://user:pass@db:5432/inventory
       - SESSION_SECRET=your_secret_here
       - NODE_ENV=production
-      - PORT=7000
     depends_on:
       db:
         condition: service_healthy
