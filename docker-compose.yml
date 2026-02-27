@@ -1,24 +1,27 @@
 services:
   app:
     build: .
+    container_name: inventario-ti
+    restart: always
     ports:
       - "5000:5000"
     environment:
       - DATABASE_URL=postgres://user:pass@db:5432/inventory
-      - SESSION_SECRET=your_secret_here
+      - SESSION_SECRET=sua_chave_super_secreta
       - NODE_ENV=production
+      - PORT=5000
     depends_on:
       db:
         condition: service_healthy
 
   db:
     image: postgres:15-alpine
+    container_name: inventario-ti-db
+    restart: always
     environment:
       - POSTGRES_USER=user
       - POSTGRES_PASSWORD=pass
       - POSTGRES_DB=inventory
-    ports:
-      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
