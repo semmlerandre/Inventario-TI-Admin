@@ -21,8 +21,8 @@ RUN npm install --omit=dev
 COPY --from=builder /app/dist ./dist
 
 ENV NODE_ENV=production
-ENV PORT=7000
+ENV PORT=5000
 
-EXPOSE 7000
+EXPOSE 5000
 
 CMD ["node", "dist/index.cjs"]
