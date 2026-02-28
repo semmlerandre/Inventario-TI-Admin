@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { AppLayout } from "@/components/layout/app-layout";
 import { useItems, useCreateItem, useUpdateItem, useDeleteItem } from "@/hooks/use-items";
-import { useCreateTransaction } from "@/hooks/use-transactions";
+import { useTransactions, useCreateTransaction } from "@/hooks/use-transactions";
 import { Plus, Search, MoreVertical, Edit2, Trash2, ArrowDownToLine, ArrowUpToLine, AlertCircle, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,6 +32,7 @@ import { type Item } from "@shared/schema";
 
 export default function InventoryPage() {
   const { data: items = [], isLoading } = useItems();
+  const { data: transactions = [] } = useTransactions();
   const createItem = useCreateItem();
   const updateItem = useUpdateItem();
   const deleteItem = useDeleteItem();

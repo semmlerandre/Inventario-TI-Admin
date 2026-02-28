@@ -1,18 +1,14 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useSettings } from "@/hooks/use-settings";
-import { useLocation } from "wouter";
+import { useLocation, Redirect } from "wouter";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm } from "react-form";
+import { useForm as useRHForm } from "react-hook-form";
 import { z } from "zod";
 import { api } from "@shared/routes";
 import { Loader2, Lock, User as UserIcon, Server } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-
-// using react-hook-form locally since we didn't specify it in requirements 
-// Wait, react-hook-form IS installed according to package.json list.
-import { useForm as useRHForm } from "react-hook-form";
 import {
   Form,
   FormControl,
@@ -27,11 +23,6 @@ export default function AuthPage() {
   const { data: settings } = useSettings();
   const [, setLocation] = useLocation();
 
-  if (user) {
-    setLocation("/");
-    return null;
-  }
-
   const form = useRHForm<z.infer<typeof api.auth.login.input>>({
     resolver: zodResolver(api.auth.login.input),
     defaultValues: {
@@ -40,16 +31,27 @@ export default function AuthPage() {
     },
   });
 
+  // Keep hooks above any returns
+  if (user) {
+    return <Redirect to="/" />;
+  }
+
   const onSubmit = (values: z.infer<typeof api.auth.login.input>) => {
     login(values);
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col justify-center relative overflow-hidden">
-      {/* Background decorations */}
-      <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full bg-primary/20 blur-3xl" />
-      <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] rounded-full bg-blue-400/20 blur-3xl" />
-
+    <div 
+      className="min-h-screen flex items-center justify-center bg-slate-50 relative overflow-hidden"
+      style={settings?.loginBackgroundUrl ? {
+        backgroundImage: `url(${settings.loginBackgroundUrl})`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center'
+      } : {}}
+    >
+      {/* Overlay if there is a background image */}
+      {settings?.loginBackgroundUrl && <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" />}
+      
       <div className="sm:mx-auto sm:w-full sm:max-w-md relative z-10">
         <div className="flex flex-col items-center mb-8">
           <div className="h-16 w-16 bg-white shadow-xl shadow-primary/10 rounded-2xl flex items-center justify-center mb-6">
