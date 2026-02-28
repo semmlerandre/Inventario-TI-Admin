@@ -43,6 +43,16 @@ export const api = {
         400: errorSchemas.validation,
         401: errorSchemas.unauthorized,
       },
+    },
+    create: {
+      method: 'POST' as const,
+      path: '/api/auth/users' as const,
+      input: z.object({ username: z.string(), password: z.string() }),
+      responses: {
+        201: z.custom<typeof users.$inferSelect>(),
+        400: errorSchemas.validation,
+        401: errorSchemas.unauthorized,
+      },
     }
   },
   settings: {

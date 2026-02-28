@@ -126,7 +126,7 @@ export class DatabaseStorage implements IStorage {
     const item = await this.getItem(transaction.itemId);
     if (item) {
       const quantityChange = transaction.type === 'in' ? transaction.quantity : -transaction.quantity;
-      const newStock = item.stock + quantityChange;
+      const newStock = Math.max(0, item.stock + quantityChange);
       await this.updateItem(item.id, { stock: newStock });
 
       if (transaction.type === 'out' && newStock <= item.minStock) {

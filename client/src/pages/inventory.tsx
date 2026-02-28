@@ -49,8 +49,7 @@ export default function InventoryPage() {
 
   const filteredItems = items.filter(item => 
     item.name.toLowerCase().includes(search.toLowerCase()) || 
-    item.category.toLowerCase().includes(search.toLowerCase()) ||
-    (item.currentHolder && item.currentHolder.toLowerCase().includes(search.toLowerCase()))
+    item.category.toLowerCase().includes(search.toLowerCase())
   );
 
   // --- ITEM FORM ---
@@ -58,14 +57,13 @@ export default function InventoryPage() {
     resolver: zodResolver(api.items.create.input.extend({
       stock: z.coerce.number().min(0),
       minStock: z.coerce.number().min(0),
-      currentHolder: z.string().optional()
     })),
-    defaultValues: { name: "", category: "", stock: 0, minStock: 5, currentHolder: "" },
+    defaultValues: { name: "", category: "", stock: 0, minStock: 5 },
   });
 
   const openCreateItem = () => {
     setEditingItem(null);
-    itemForm.reset({ name: "", category: "", stock: 0, minStock: 5, currentHolder: "" });
+    itemForm.reset({ name: "", category: "", stock: 0, minStock: 5 });
     setIsItemDialogOpen(true);
   };
 
@@ -76,7 +74,6 @@ export default function InventoryPage() {
       category: item.category, 
       stock: item.stock, 
       minStock: item.minStock,
-      currentHolder: item.currentHolder || "" 
     });
     setIsItemDialogOpen(true);
   };
@@ -105,14 +102,35 @@ export default function InventoryPage() {
       quantity: z.coerce.number().min(1),
       itemId: z.coerce.number()
     })),
-    defaultValues: { itemId: 0, quantity: 1, type: "in", ticketNumber: "", requesterName: "" },
+    defaultValues: { itemId: 0, quantity: 1, type: "in", ticketNumber: "", requesterName: "", department: "" },
   });
 
   const openTransaction = (item: Item, type: 'in'|'out') => {
     setTxItem(item);
     setTxType(type);
-    txForm.reset({ itemId: item.id, quantity: 1, type, ticketNumber: "", requesterName: "" });
+    txForm.reset({ itemId: item.id, quantity: 1, type, ticketNumber: "", requesterName: "", department: "" });
     setIsTxDialogOpen(true);
+  };
+
+  const downloadXLSX = () => {
+    let csv = "Nome,Categoria,Estoque Atual,Status,Usuarios\n";
+    filteredItems.forEach(item => {
+      const status = item.stock <= item.minStock ? "Baixo" : "Normal";
+      const holders = transactions
+        .filter(t => t.itemId === item.id && t.type === 'out')
+        .map(t => `${t.requesterName} (${t.department || 'N/A'})`)
+        .join(" | ");
+      csv += `${item.name},${item.category},${item.stock},${status},"${holders}"\n`;
+    });
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute("download", "estoque.csv");
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const onTxSubmit = (values: z.infer<typeof api.transactions.create.input>) => {
@@ -147,7 +165,10 @@ export default function InventoryPage() {
               />
             </div>
             <div className="flex gap-2">
-              <Button variant="outline" size="sm" onClick={() => window.print()} className="hidden md:flex">
+              <Button variant="outline" size="sm" onClick={downloadXLSX} className="hidden md:flex no-print">
+                <Download className="w-4 h-4 mr-2" /> Excel / CSV
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => window.print()} className="hidden md:flex no-print">
                 <Download className="w-4 h-4 mr-2" /> PDF / Relatório
               </Button>
             </div>
@@ -159,7 +180,6 @@ export default function InventoryPage() {
                 <tr>
                   <th className="px-6 py-4 font-semibold">Nome do Item</th>
                   <th className="px-6 py-4 font-semibold">Categoria</th>
-                  <th className="px-6 py-4 font-semibold">Usuário Atual</th>
                   <th className="px-6 py-4 font-semibold text-right">Estoque Atual</th>
                   <th className="px-6 py-4 font-semibold text-center">Status</th>
                   <th className="px-6 py-4 text-right">Ações</th>
@@ -173,9 +193,17 @@ export default function InventoryPage() {
                 ) : (
                   filteredItems.map((item) => (
                     <tr key={item.id} className="hover:bg-slate-50/80 transition-colors group">
-                      <td className="px-6 py-4 font-medium text-slate-900">{item.name}</td>
+                      <td className="px-6 py-4 font-medium text-slate-900">
+                        {item.name}
+                        <div className="text-xs text-slate-400 mt-1 print-only">
+                          {transactions
+                            .filter(t => t.itemId === item.id && t.type === 'out')
+                            .map((t, idx) => (
+                              <div key={idx}>{t.requesterName} - {t.department}</div>
+                            ))}
+                        </div>
+                      </td>
                       <td className="px-6 py-4 text-slate-500">{item.category}</td>
-                      <td className="px-6 py-4 text-slate-500 italic">{item.currentHolder || '-'}</td>
                       <td className="px-6 py-4 text-right font-display font-semibold text-slate-700">
                         {item.stock}
                       </td>
@@ -238,13 +266,6 @@ export default function InventoryPage() {
                 <FormField control={itemForm.control} name="category" render={({ field }) => (
                   <FormItem><FormLabel>Categoria</FormLabel><FormControl><Input placeholder="Ex: Mouses" {...field} /></FormControl><FormMessage /></FormItem>
                 )} />
-                <FormField control={itemForm.control} name="currentHolder" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Usuário Atual (Quem está com o item)</FormLabel>
-                    <FormControl><Input placeholder="Ex: Depto Financeiro / João" {...field} value={field.value || ''} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
                 <div className="grid grid-cols-2 gap-4">
                   <FormField control={itemForm.control} name="stock" render={({ field }) => (
                     <FormItem><FormLabel>Estoque Inicial</FormLabel><FormControl><Input type="number" {...field} disabled={!!editingItem} /></FormControl><FormMessage /></FormItem>
@@ -283,6 +304,9 @@ export default function InventoryPage() {
                     )} />
                     <FormField control={txForm.control} name="requesterName" render={({ field }) => (
                       <FormItem><FormLabel>Solicitante (Opcional)</FormLabel><FormControl><Input placeholder="Ex: João Silva" {...field} /></FormControl><FormMessage /></FormItem>
+                    )} />
+                    <FormField control={txForm.control} name="department" render={({ field }) => (
+                      <FormItem><FormLabel>Departamento (Opcional)</FormLabel><FormControl><Input placeholder="Ex: Financeiro" {...field} /></FormControl><FormMessage /></FormItem>
                     )} />
                   </>
                 )}

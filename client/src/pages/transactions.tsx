@@ -39,6 +39,7 @@ export default function TransactionsPage() {
                   <th className="px-6 py-4 font-semibold text-center">Quantidade</th>
                   <th className="px-6 py-4 font-semibold">Chamado</th>
                   <th className="px-6 py-4 font-semibold">Solicitante</th>
+                  <th className="px-6 py-4 font-semibold">Departamento</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -77,6 +78,9 @@ export default function TransactionsPage() {
                       </td>
                       <td className="px-6 py-4 text-slate-500">
                         {t.requesterName || <span className="text-slate-300">-</span>}
+                      </td>
+                      <td className="px-6 py-4 text-slate-500">
+                        {t.department || <span className="text-slate-300">-</span>}
                       </td>
                     </tr>
                   ))

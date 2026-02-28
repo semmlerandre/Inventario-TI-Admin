@@ -7,10 +7,55 @@ import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { api } from "@shared/routes";
+import { api, buildUrl } from "@shared/routes";
 import { z } from "zod";
 import { useEffect } from "react";
-import { Palette, Shield, Building2 } from "lucide-react";
+import { Palette, Shield, Building2, Plus, UserPlus } from "lucide-react";
+import { useMutation } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+
+function UserCreationForm() {
+  const { toast } = useToast();
+  const form = useForm<z.infer<typeof api.auth.create.input>>({
+    resolver: zodResolver(api.auth.create.input),
+    defaultValues: { username: "", password: "" },
+  });
+
+  const mutation = useMutation({
+    mutationFn: async (values: z.infer<typeof api.auth.create.input>) => {
+      const res = await apiRequest("POST", api.auth.create.path, values);
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Sucesso", description: "Usuário criado com sucesso!" });
+      form.reset();
+    },
+    onError: (err: any) => {
+      toast({ 
+        title: "Erro", 
+        description: err.message || "Erro ao criar usuário", 
+        variant: "destructive" 
+      });
+    }
+  });
+
+  return (
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit((v) => mutation.mutate(v))} className="space-y-4">
+        <FormField control={form.control} name="username" render={({ field }) => (
+          <FormItem><FormLabel>Usuário</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+        )} />
+        <FormField control={form.control} name="password" render={({ field }) => (
+          <FormItem><FormLabel>Senha</FormLabel><FormControl><Input type="password" {...field} /></FormControl><FormMessage /></FormItem>
+        )} />
+        <Button type="submit" variant="secondary" className="w-full" disabled={mutation.isPending}>
+          <UserPlus className="h-4 w-4 mr-2" /> Criar Usuário
+        </Button>
+      </form>
+    </Form>
+  );
+}
 
 const PRESET_COLORS = [
   "#0ea5e9", // Sky
@@ -56,6 +101,15 @@ export default function SettingsPage() {
         appName: settings.appName || "",
         logoUrl: settings.logoUrl || "",
         primaryColor: settings.primaryColor || "#0ea5e9",
+        alertEmail: settings.alertEmail || "",
+        alertStockLevel: settings.alertStockLevel || 5,
+        smtpHost: settings.smtpHost || "",
+        smtpPort: settings.smtpPort || 587,
+        smtpUser: settings.smtpUser || "",
+        smtpPass: settings.smtpPass || "",
+        webhookTeams: settings.webhookTeams || "",
+        webhookSlack: settings.webhookSlack || "",
+        loginBackgroundUrl: settings.loginBackgroundUrl || "",
       });
     }
   }, [settings, settingsForm]);
@@ -156,6 +210,9 @@ export default function SettingsPage() {
                       <FormField control={settingsForm.control} name="webhookSlack" render={({ field }) => (
                         <FormItem><FormLabel>Webhook Slack</FormLabel><FormControl><Input placeholder="https://hooks.slack.com/services/..." {...field} value={field.value || ''} /></FormControl></FormItem>
                       )} />
+                      <FormField control={settingsForm.control} name="loginBackgroundUrl" render={({ field }) => (
+                        <FormItem><FormLabel>URL da Imagem de Fundo (Login)</FormLabel><FormControl><Input placeholder="https://exemplo.com/background.jpg" {...field} value={field.value || ''} /></FormControl></FormItem>
+                      )} />
                     </div>
                   </div>
 
@@ -195,6 +252,19 @@ export default function SettingsPage() {
                   </Button>
                 </form>
               </Form>
+            </CardContent>
+          </Card>
+
+          <Card className="border-none shadow-md shadow-slate-200/50">
+            <CardHeader className="border-b border-slate-100 bg-slate-50/50 rounded-t-xl">
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <Plus className="h-5 w-5 text-primary" />
+                Gerenciar Usuários
+              </CardTitle>
+              <CardDescription>Crie novos usuários para o sistema</CardDescription>
+            </CardHeader>
+            <CardContent className="pt-6">
+              <UserCreationForm />
             </CardContent>
           </Card>
 

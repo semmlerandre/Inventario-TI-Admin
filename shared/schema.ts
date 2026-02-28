@@ -22,6 +22,7 @@ export const settings = pgTable("settings", {
   smtpPass: text("smtp_pass"),
   webhookTeams: text("webhook_teams"),
   webhookSlack: text("webhook_slack"),
+  loginBackgroundUrl: text("login_background_url"),
 });
 
 export const items = pgTable("items", {
@@ -30,7 +31,6 @@ export const items = pgTable("items", {
   category: text("category").notNull(),
   stock: integer("stock").notNull().default(0),
   minStock: integer("min_stock").notNull().default(5),
-  currentHolder: text("current_holder"), // Quem está utilizando
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -41,6 +41,7 @@ export const transactions = pgTable("transactions", {
   type: text("type").notNull(), // 'in' or 'out'
   ticketNumber: text("ticket_number"), // chamado
   requesterName: text("requester_name"), // solicitante
+  department: text("department"), // departamento
   createdAt: timestamp("created_at").defaultNow(),
 });
 

@@ -59,6 +59,27 @@ export async function registerRoutes(
     }
   });
 
+  app.post(api.auth.create.path, requireAuth, async (req, res) => {
+    try {
+      const input = api.auth.create.input.parse(req.body);
+      const existing = await storage.getUserByUsername(input.username);
+      if (existing) {
+        return res.status(400).json({ message: "Usuário já existe", field: "username" });
+      }
+      const hashedPassword = await hashPassword(input.password);
+      const user = await storage.createUser({
+        username: input.username,
+        password: hashedPassword,
+      });
+      res.status(201).json(user);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message, field: err.errors[0].path.join('.') });
+      }
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
   app.get(api.settings.get.path, async (req, res) => {
     const settings = await storage.getSettings();
     if (!settings) {

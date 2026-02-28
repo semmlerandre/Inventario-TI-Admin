@@ -92,6 +92,36 @@
   }
 }
 
+@media print {
+  aside, 
+  header, 
+  nav,
+  button,
+  .no-print {
+    display: none !important;
+  }
+  
+  main {
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    max-height: none !important;
+  }
+
+  .print-only {
+    display: block !important;
+  }
+
+  .Card, .shadow-md {
+    box-shadow: none !important;
+    border: 1px solid #eee !important;
+  }
+
+  body {
+    background: white !important;
+  }
+}
+
 .glass-card {
   @apply bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl border border-white/20 dark:border-white/10 shadow-xl shadow-black/5;
 }
