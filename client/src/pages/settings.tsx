@@ -204,6 +204,12 @@ export default function SettingsPage() {
     updateSettings.mutate(values);
   };
 
+  const onPwdSubmit = (values: z.infer<typeof api.auth.changePassword.input>) => {
+    changePassword.mutate(values, {
+      onSuccess: () => pwdForm.reset()
+    });
+  };
+
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, field: "logoData" | "loginBackgroundData") => {
     const file = e.target.files?.[0];
     if (file) {
