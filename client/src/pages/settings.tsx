@@ -1,6 +1,6 @@
 import { AppLayout } from "@/components/layout/app-layout";
 import { useSettings, useUpdateSettings } from "@/hooks/use-settings";
-import { useChangePassword } from "@/hooks/use-auth";
+import { useChangePassword, useAuth } from "@/hooks/use-auth";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -9,14 +9,90 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { api, buildUrl } from "@shared/routes";
 import { z } from "zod";
-import { useEffect } from "react";
-import { Palette, Shield, Building2, Plus, UserPlus } from "lucide-react";
-import { useMutation } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
+import { Palette, Shield, Building2, Plus, UserPlus, Trash2, Lock, Unlock, RefreshCw, Upload, Image as ImageIcon } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
+function UserManagement() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const { user: currentUser } = useAuth();
+  const { data: users = [], isLoading } = useQuery<any[]>({ queryKey: ["/api/auth/users"] });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: number) => {
+      await apiRequest("DELETE", `/api/auth/users/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/users"] });
+      toast({ title: "Sucesso", description: "Usuário excluído" });
+    }
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, updates }: { id: number, updates: any }) => {
+      await apiRequest("PATCH", `/api/auth/users/${id}`, updates);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/users"] });
+      toast({ title: "Sucesso", description: "Usuário atualizado" });
+    }
+  });
+
+  if (isLoading) return <div>Carregando usuários...</div>;
+
+  return (
+    <div className="space-y-4">
+      <div className="divide-y divide-slate-100">
+        {users.map((u) => (
+          <div key={u.id} className="py-3 flex items-center justify-between">
+            <div>
+              <p className="font-medium text-slate-900">{u.username}</p>
+              <p className="text-xs text-slate-500">{u.isActive ? "Ativo" : "Bloqueado"}</p>
+            </div>
+            <div className="flex gap-2">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => {
+                  const newPwd = prompt("Nova senha para " + u.username);
+                  if (newPwd) updateMutation.mutate({ id: u.id, updates: { password: newPwd } });
+                }}
+              >
+                <RefreshCw className="h-4 w-4 mr-2" /> Reset
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => updateMutation.mutate({ id: u.id, updates: { isActive: !u.isActive } })}
+              >
+                {u.isActive ? <Lock className="h-4 w-4 mr-2" /> : <Unlock className="h-4 w-4 mr-2" />}
+                {u.isActive ? "Bloquear" : "Desbloquear"}
+              </Button>
+              {currentUser?.id !== u.id && (
+                <Button variant="destructive" size="sm" onClick={() => {
+                  if (confirm("Excluir usuário " + u.username + "?")) deleteMutation.mutate(u.id);
+                }}>
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="pt-4 border-t border-slate-100">
+        <h4 className="text-sm font-semibold mb-3">Novo Usuário</h4>
+        <UserCreationForm />
+      </div>
+    </div>
+  );
+}
+
 function UserCreationForm() {
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const form = useForm<z.infer<typeof api.auth.create.input>>({
     resolver: zodResolver(api.auth.create.input),
     defaultValues: { username: "", password: "" },
@@ -29,6 +105,7 @@ function UserCreationForm() {
     },
     onSuccess: () => {
       toast({ title: "Sucesso", description: "Usuário criado com sucesso!" });
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/users"] });
       form.reset();
     },
     onError: (err: any) => {
@@ -87,7 +164,14 @@ export default function SettingsPage() {
 
   const settingsForm = useForm<z.infer<typeof api.settings.update.input>>({
     resolver: zodResolver(api.settings.update.input),
-    defaultValues: { appName: "", logoUrl: "", primaryColor: "" },
+    defaultValues: { 
+      appName: "", 
+      logoUrl: "", 
+      logoData: "",
+      primaryColor: "",
+      loginBackgroundUrl: "",
+      loginBackgroundData: ""
+    },
   });
 
   const pwdForm = useForm<z.infer<typeof api.auth.changePassword.input>>({
@@ -100,6 +184,7 @@ export default function SettingsPage() {
       settingsForm.reset({
         appName: settings.appName || "",
         logoUrl: settings.logoUrl || "",
+        logoData: settings.logoData || "",
         primaryColor: settings.primaryColor || "#0ea5e9",
         alertEmail: settings.alertEmail || "",
         alertStockLevel: settings.alertStockLevel || 5,
@@ -110,6 +195,7 @@ export default function SettingsPage() {
         webhookTeams: settings.webhookTeams || "",
         webhookSlack: settings.webhookSlack || "",
         loginBackgroundUrl: settings.loginBackgroundUrl || "",
+        loginBackgroundData: settings.loginBackgroundData || "",
       });
     }
   }, [settings, settingsForm]);
@@ -118,10 +204,15 @@ export default function SettingsPage() {
     updateSettings.mutate(values);
   };
 
-  const onPwdSubmit = (values: z.infer<typeof api.auth.changePassword.input>) => {
-    changePassword.mutate(values, {
-      onSuccess: () => pwdForm.reset()
-    });
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, field: "logoData" | "loginBackgroundData") => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        settingsForm.setValue(field, reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   if (isLoading) return <AppLayout><div className="p-8">Carregando...</div></AppLayout>;
@@ -157,8 +248,59 @@ export default function SettingsPage() {
                   )} />
                   <FormField control={settingsForm.control} name="logoUrl" render={({ field }) => (
                     <FormItem>
-                      <FormLabel>URL da Logo</FormLabel>
-                      <FormControl><Input placeholder="https://exemplo.com/logo.png" {...field} value={field.value || ''} /></FormControl>
+                      <FormLabel>Logo da Empresa</FormLabel>
+                      <div className="space-y-4">
+                        <div className="flex items-center gap-4">
+                          <div className="h-16 w-16 rounded-xl border-2 border-dashed border-slate-200 flex items-center justify-center bg-slate-50 overflow-hidden">
+                            {settingsForm.watch("logoData") ? (
+                              <img src={settingsForm.watch("logoData")!} alt="Logo" className="h-full w-full object-contain" />
+                            ) : field.value ? (
+                              <img src={field.value} alt="Logo" className="h-full w-full object-contain" />
+                            ) : (
+                              <ImageIcon className="h-8 w-8 text-slate-300" />
+                            )}
+                          </div>
+                          <div className="flex-1 space-y-2">
+                            <div className="flex gap-2">
+                              <Button 
+                                type="button" 
+                                variant="outline" 
+                                size="sm" 
+                                className="relative overflow-hidden hover-lift"
+                                onClick={() => document.getElementById('logo-upload')?.click()}
+                              >
+                                <Upload className="h-4 w-4 mr-2" /> Upload Logo
+                                <input 
+                                  id="logo-upload"
+                                  type="file" 
+                                  className="hidden" 
+                                  accept="image/*"
+                                  onChange={(e) => handleFileUpload(e, "logoData")}
+                                />
+                              </Button>
+                              {(field.value || settingsForm.watch("logoData")) && (
+                                <Button 
+                                  type="button" 
+                                  variant="ghost" 
+                                  size="sm" 
+                                  className="text-rose-500"
+                                  onClick={() => {
+                                    field.onChange("");
+                                    settingsForm.setValue("logoData", "");
+                                  }}
+                                >
+                                  Remover
+                                </Button>
+                              )}
+                            </div>
+                            <p className="text-[10px] text-slate-400">Formatos aceitos: PNG, JPG, SVG (Máx 2MB)</p>
+                          </div>
+                        </div>
+                        <div className="space-y-1">
+                          <FormLabel className="text-xs text-slate-500">Ou use uma URL externa</FormLabel>
+                          <FormControl><Input placeholder="https://exemplo.com/logo.png" {...field} value={field.value || ''} className="h-9 text-sm" /></FormControl>
+                        </div>
+                      </div>
                       <FormMessage />
                     </FormItem>
                   )} />
@@ -211,7 +353,44 @@ export default function SettingsPage() {
                         <FormItem><FormLabel>Webhook Slack</FormLabel><FormControl><Input placeholder="https://hooks.slack.com/services/..." {...field} value={field.value || ''} /></FormControl></FormItem>
                       )} />
                       <FormField control={settingsForm.control} name="loginBackgroundUrl" render={({ field }) => (
-                        <FormItem><FormLabel>URL da Imagem de Fundo (Login)</FormLabel><FormControl><Input placeholder="https://exemplo.com/background.jpg" {...field} value={field.value || ''} /></FormControl></FormItem>
+                        <FormItem>
+                          <FormLabel>Imagem de Fundo (Login)</FormLabel>
+                          <div className="space-y-3">
+                            <div className="flex items-center gap-3">
+                              <Button 
+                                type="button" 
+                                variant="outline" 
+                                size="sm" 
+                                className="w-full hover-lift"
+                                onClick={() => document.getElementById('bg-upload')?.click()}
+                              >
+                                <Upload className="h-4 w-4 mr-2" /> Upload Imagem
+                                <input 
+                                  id="bg-upload"
+                                  type="file" 
+                                  className="hidden" 
+                                  accept="image/*"
+                                  onChange={(e) => handleFileUpload(e, "loginBackgroundData")}
+                                />
+                              </Button>
+                              {(field.value || settingsForm.watch("loginBackgroundData")) && (
+                                <Button 
+                                  type="button" 
+                                  variant="ghost" 
+                                  size="sm" 
+                                  className="text-rose-500"
+                                  onClick={() => {
+                                    field.onChange("");
+                                    settingsForm.setValue("loginBackgroundData", "");
+                                  }}
+                                >
+                                  Limpar
+                                </Button>
+                              )}
+                            </div>
+                            <FormControl><Input placeholder="Ou cole uma URL: https://..." {...field} value={field.value || ''} className="h-9 text-sm" /></FormControl>
+                          </div>
+                        </FormItem>
                       )} />
                     </div>
                   </div>
@@ -264,7 +443,7 @@ export default function SettingsPage() {
               <CardDescription>Crie novos usuários para o sistema</CardDescription>
             </CardHeader>
             <CardContent className="pt-6">
-              <UserCreationForm />
+              <UserManagement />
             </CardContent>
           </Card>
 

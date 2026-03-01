@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, timestamp, boolean } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -7,11 +7,13 @@ export const users = pgTable("users", {
   id: serial("id").primaryKey(),
   username: text("username").notNull().unique(),
   password: text("password").notNull(),
+  isActive: boolean("is_active").notNull().default(true),
 });
 
 export const settings = pgTable("settings", {
   id: serial("id").primaryKey(),
   logoUrl: text("logo_url"),
+  logoData: text("logo_data"),
   primaryColor: text("primary_color").default("#0ea5e9"),
   appName: text("app_name").default("TI Inventory"),
   alertEmail: text("alert_email"),
@@ -23,6 +25,7 @@ export const settings = pgTable("settings", {
   webhookTeams: text("webhook_teams"),
   webhookSlack: text("webhook_slack"),
   loginBackgroundUrl: text("login_background_url"),
+  loginBackgroundData: text("login_background_data"),
 });
 
 export const items = pgTable("items", {

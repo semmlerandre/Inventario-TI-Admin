@@ -28,8 +28,8 @@ export function AppLayout({ children }: { children: ReactNode }) {
             <Loader2 className="h-5 w-5 animate-spin text-primary" />
           ) : (
             <div className="flex items-center gap-3">
-              {settings?.logoUrl ? (
-                <img src={settings.logoUrl} alt="Logo" className="h-8 w-8 rounded-md object-contain" />
+              {(settings?.logoData || settings?.logoUrl) ? (
+                <img src={settings.logoData || settings.logoUrl!} alt="Logo" className="h-8 w-8 rounded-md object-contain" />
               ) : (
                 <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
                   <Server className="h-4 w-4" />

@@ -70,6 +70,7 @@ export async function registerRoutes(
       const user = await storage.createUser({
         username: input.username,
         password: hashedPassword,
+        isActive: true,
       });
       res.status(201).json(user);
     } catch (err) {
@@ -78,6 +79,38 @@ export async function registerRoutes(
       }
       res.status(500).json({ message: "Internal server error" });
     }
+  });
+
+  app.get("/api/auth/users", requireAuth, async (req, res) => {
+    const usersList = await storage.getUsers();
+    res.json(usersList);
+  });
+
+  app.patch("/api/auth/users/:id", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { isActive, password } = req.body;
+      const updates: any = {};
+      
+      if (isActive !== undefined) updates.isActive = isActive;
+      if (password) {
+        updates.password = await hashPassword(password);
+      }
+      
+      const updated = await storage.updateUser(id, updates);
+      res.json(updated);
+    } catch (err) {
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.delete("/api/auth/users/:id", requireAuth, async (req, res) => {
+    const id = parseInt(req.params.id);
+    if ((req.user as any).id === id) {
+      return res.status(400).json({ message: "Não é possível excluir a si mesmo" });
+    }
+    await storage.deleteUser(id);
+    res.status(204).end();
   });
 
   app.get(api.settings.get.path, async (req, res) => {

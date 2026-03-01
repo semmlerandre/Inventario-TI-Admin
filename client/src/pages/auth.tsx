@@ -43,20 +43,20 @@ export default function AuthPage() {
   return (
     <div 
       className="min-h-screen flex items-center justify-center bg-slate-50 relative overflow-hidden"
-      style={settings?.loginBackgroundUrl ? {
-        backgroundImage: `url(${settings.loginBackgroundUrl})`,
+      style={(settings?.loginBackgroundData || settings?.loginBackgroundUrl) ? {
+        backgroundImage: `url(${settings.loginBackgroundData || settings.loginBackgroundUrl})`,
         backgroundSize: 'cover',
         backgroundPosition: 'center'
       } : {}}
     >
       {/* Overlay if there is a background image */}
-      {settings?.loginBackgroundUrl && <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" />}
+      {(settings?.loginBackgroundData || settings?.loginBackgroundUrl) && <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" />}
       
       <div className="sm:mx-auto sm:w-full sm:max-w-md relative z-10">
         <div className="flex flex-col items-center mb-8">
           <div className="h-16 w-16 bg-white shadow-xl shadow-primary/10 rounded-2xl flex items-center justify-center mb-6">
-            {settings?.logoUrl ? (
-              <img src={settings.logoUrl} alt="Logo" className="h-10 w-10 object-contain" />
+            {(settings?.logoData || settings?.logoUrl) ? (
+              <img src={settings.logoData || settings.logoUrl!} alt="Logo" className="h-10 w-10 object-contain" />
             ) : (
               <Server className="h-8 w-8 text-primary" />
             )}
