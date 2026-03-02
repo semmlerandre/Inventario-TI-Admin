@@ -49,7 +49,10 @@ function UserManagement() {
         {users.map((u) => (
           <div key={u.id} className="py-3 flex items-center justify-between">
             <div>
-              <p className="font-medium text-slate-900">{u.username}</p>
+              <p className="font-medium text-slate-900">
+                {u.username} 
+                {u.isAdmin && <span className="ml-2 text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded-full uppercase font-bold tracking-wider">Admin</span>}
+              </p>
               <p className="text-xs text-slate-500">{u.isActive ? "Ativo" : "Bloqueado"}</p>
             </div>
             <div className="flex gap-2">
@@ -70,6 +73,14 @@ function UserManagement() {
               >
                 {u.isActive ? <Lock className="h-4 w-4 mr-2" /> : <Unlock className="h-4 w-4 mr-2" />}
                 {u.isActive ? "Bloquear" : "Desbloquear"}
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => updateMutation.mutate({ id: u.id, updates: { isAdmin: !u.isAdmin } })}
+              >
+                {u.isAdmin ? <Shield className="h-4 w-4 mr-2" /> : <Shield className="h-4 w-4 mr-2 text-slate-400" />}
+                {u.isAdmin ? "Remover Admin" : "Tornar Admin"}
               </Button>
               {currentUser?.id !== u.id && (
                 <Button variant="destructive" size="sm" onClick={() => {
@@ -93,13 +104,13 @@ function UserManagement() {
 function UserCreationForm() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const form = useForm<z.infer<typeof api.auth.create.input>>({
-    resolver: zodResolver(api.auth.create.input),
-    defaultValues: { username: "", password: "" },
+  const form = useForm<z.infer<typeof api.auth.create.input> & { isAdmin: boolean }>({
+    resolver: zodResolver(api.auth.create.input.extend({ isAdmin: z.boolean().default(false) })),
+    defaultValues: { username: "", password: "", isAdmin: false },
   });
 
   const mutation = useMutation({
-    mutationFn: async (values: z.infer<typeof api.auth.create.input>) => {
+    mutationFn: async (values: any) => {
       const res = await apiRequest("POST", api.auth.create.path, values);
       return res.json();
     },
@@ -125,6 +136,21 @@ function UserCreationForm() {
         )} />
         <FormField control={form.control} name="password" render={({ field }) => (
           <FormItem><FormLabel>Senha</FormLabel><FormControl><Input type="password" {...field} /></FormControl><FormMessage /></FormItem>
+        )} />
+        <FormField control={form.control} name="isAdmin" render={({ field }) => (
+          <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
+            <div className="space-y-0.5">
+              <FormLabel>Administrador</FormLabel>
+            </div>
+            <FormControl>
+              <input
+                type="checkbox"
+                checked={field.value}
+                onChange={field.onChange}
+                className="h-4 w-4"
+              />
+            </FormControl>
+          </FormItem>
         )} />
         <Button type="submit" variant="secondary" className="w-full" disabled={mutation.isPending}>
           <UserPlus className="h-4 w-4 mr-2" /> Criar Usuário
