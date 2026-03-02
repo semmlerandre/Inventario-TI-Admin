@@ -66,8 +66,10 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
-    const [user] = await db.insert(users).values(insertUser).returning();
-    return user;
+    const [user] = await db.select().from(users);
+    const isAdmin = !user; // First user is admin
+    const [newUser] = await db.insert(users).values({ ...insertUser, isAdmin }).returning();
+    return newUser;
   }
 
   async updateUser(id: number, updates: Partial<User>): Promise<User> {

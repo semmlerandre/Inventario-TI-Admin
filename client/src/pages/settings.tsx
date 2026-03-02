@@ -158,6 +158,7 @@ const PRESET_COLORS = [
 ];
 
 export default function SettingsPage() {
+  const { user } = useAuth();
   const { data: settings, isLoading } = useSettings();
   const updateSettings = useUpdateSettings();
   const changePassword = useChangePassword();
@@ -224,6 +225,51 @@ export default function SettingsPage() {
   if (isLoading) return <AppLayout><div className="p-8">Carregando...</div></AppLayout>;
 
   const currentColor = settingsForm.watch("primaryColor");
+
+  if (!user?.isAdmin) {
+    return (
+      <AppLayout>
+        <div className="space-y-6 max-w-4xl">
+          <div>
+            <h1 className="text-3xl font-display font-bold text-slate-900">Configurações</h1>
+            <p className="text-slate-500 mt-1">Gerencie sua segurança.</p>
+          </div>
+          <Card className="border-none shadow-md shadow-slate-200/50">
+            <CardHeader className="border-b border-slate-100 bg-slate-50/50 rounded-t-xl">
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <Shield className="h-5 w-5 text-primary" />
+                Segurança
+              </CardTitle>
+              <CardDescription>Atualize sua senha de acesso</CardDescription>
+            </CardHeader>
+            <CardContent className="pt-6">
+              <Form {...pwdForm}>
+                <form onSubmit={pwdForm.handleSubmit(onPwdSubmit)} className="space-y-5">
+                  <FormField control={pwdForm.control} name="currentPassword" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Senha Atual</FormLabel>
+                      <FormControl><Input type="password" {...field} /></FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                  <FormField control={pwdForm.control} name="newPassword" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Nova Senha</FormLabel>
+                      <FormControl><Input type="password" {...field} /></FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                  <Button type="submit" variant="secondary" className="w-full" disabled={changePassword.isPending}>
+                    Alterar Senha
+                  </Button>
+                </form>
+              </Form>
+            </CardContent>
+          </Card>
+        </div>
+      </AppLayout>
+    );
+  }
 
   return (
     <AppLayout>

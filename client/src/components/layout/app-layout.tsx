@@ -14,7 +14,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
     { href: "/", label: "Dashboard", icon: LayoutDashboard },
     { href: "/estoque", label: "Estoque", icon: Package },
     { href: "/movimentacoes", label: "Movimentações", icon: ArrowLeftRight },
-    { href: "/configuracoes", label: "Configurações", icon: Settings },
+    ...(user?.isAdmin ? [{ href: "/configuracoes", label: "Configurações", icon: Settings }] : []),
   ];
 
   if (!user) return null;
@@ -71,7 +71,9 @@ export function AppLayout({ children }: { children: ReactNode }) {
                 {user.username.substring(0, 2).toUpperCase()}
               </div>
               <div className="flex flex-col">
-                <span className="text-sm font-semibold text-slate-900 leading-tight">Admin</span>
+                <span className="text-sm font-semibold text-slate-900 leading-tight">
+                  {user.isAdmin ? "Admin" : "Usuário"}
+                </span>
                 <span className="text-xs text-slate-500 leading-tight">@{user.username}</span>
               </div>
             </div>
