@@ -49,6 +49,7 @@ export async function registerRoutes(
 
       const newHash = await hashPassword(input.newPassword);
       await storage.updateUserPassword(user.id, newHash);
+      await storage.updateUser(user.id, { mustChangePassword: false });
       
       res.status(200).json({ message: "Password updated successfully" });
     } catch (err) {
@@ -71,6 +72,7 @@ export async function registerRoutes(
         username: input.username,
         password: hashedPassword,
         isActive: true,
+        isAdmin: (req.body as any).isAdmin || false,
       });
       res.status(201).json(user);
     } catch (err) {
@@ -89,10 +91,11 @@ export async function registerRoutes(
   app.patch("/api/auth/users/:id", requireAuth, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
-      const { isActive, password } = req.body;
+      const { isActive, password, isAdmin } = req.body;
       const updates: any = {};
       
       if (isActive !== undefined) updates.isActive = isActive;
+      if (isAdmin !== undefined) updates.isAdmin = isAdmin;
       if (password) {
         updates.password = await hashPassword(password);
       }

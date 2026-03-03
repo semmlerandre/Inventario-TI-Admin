@@ -114,20 +114,20 @@ export default function InventoryPage() {
   };
 
   const downloadXLSX = () => {
-    let csv = "Nome,Categoria,Estoque Atual,Status,Usuarios\n";
+    let content = "\uFEFFNome\tCategoria\tEstoque Atual\tStatus\tUsuários / Detalhes\n";
     filteredItems.forEach(item => {
       const status = item.stock <= item.minStock ? "Baixo" : "Normal";
       const holders = transactions
         .filter(t => t.itemId === item.id && t.type === 'out')
         .map(t => `${t.requesterName} (${t.department || 'N/A'})`)
         .join(" | ");
-      csv += `${item.name},${item.category},${item.stock},${status},"${holders}"\n`;
+      content += `${item.name}\t${item.category}\t${item.stock}\t${status}\t${holders}\n`;
     });
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const blob = new Blob([content], { type: 'application/vnd.ms-excel;charset=utf-8;' });
     const link = document.createElement("a");
     const url = URL.createObjectURL(blob);
     link.setAttribute("href", url);
-    link.setAttribute("download", "estoque.csv");
+    link.setAttribute("download", "estoque.xls");
     link.style.visibility = 'hidden';
     document.body.appendChild(link);
     link.click();

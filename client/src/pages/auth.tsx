@@ -9,6 +9,10 @@ import { api } from "@shared/routes";
 import { Loader2, Lock, User as UserIcon, Server } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
+import { apiRequest } from "@/lib/queryClient";
+import { useMutation } from "@tanstack/react-query";
+import { useToast } from "@/hooks/use-toast";
 import {
   Form,
   FormControl,
@@ -22,6 +26,7 @@ export default function AuthPage() {
   const { login, isLoggingIn, user } = useAuth();
   const { data: settings } = useSettings();
   const [, setLocation] = useLocation();
+  const [showPasswordChange, setShowPasswordChange] = useState(false);
 
   const form = useRHForm<z.infer<typeof api.auth.login.input>>({
     resolver: zodResolver(api.auth.login.input),
@@ -31,14 +36,79 @@ export default function AuthPage() {
     },
   });
 
-  // Keep hooks above any returns
-  if (user) {
+  const changePassword = useMutation({
+    mutationFn: async (values: any) => {
+      await apiRequest("POST", "/api/auth/change-password", values);
+    },
+    onSuccess: () => {
+      toast({ title: "Sucesso", description: "Senha alterada com sucesso!" });
+      setShowPasswordChange(false);
+      window.location.reload(); // Refresh to update user state
+    },
+    onError: (err: any) => {
+      toast({ title: "Erro", description: err.message, variant: "destructive" });
+    }
+  });
+
+  const passwordForm = useRHForm({
+    defaultValues: { currentPassword: "", newPassword: "" }
+  });
+
+  useEffect(() => {
+    if (user?.mustChangePassword) {
+      setShowPasswordChange(true);
+    }
+  }, [user]);
+
+  if (user && !user.mustChangePassword) {
     return <Redirect to="/" />;
   }
 
   const onSubmit = (values: z.infer<typeof api.auth.login.input>) => {
     login(values);
   };
+
+  if (showPasswordChange) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
+        <Card className="w-full max-w-md shadow-2xl rounded-3xl overflow-hidden border-none">
+          <CardHeader className="bg-primary text-primary-foreground pb-8">
+            <CardTitle className="text-2xl font-display">Alterar Senha</CardTitle>
+            <CardDescription className="text-primary-foreground/80">Para sua segurança, altere sua senha no primeiro acesso.</CardDescription>
+          </CardHeader>
+          <CardContent className="pt-6">
+            <form onSubmit={passwordForm.handleSubmit((v) => changePassword.mutate(v))} className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-700">Senha Atual</label>
+                <Input 
+                  type="password" 
+                  {...passwordForm.register("currentPassword")} 
+                  required 
+                  className="h-12 rounded-xl border-slate-200"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-700">Nova Senha</label>
+                <Input 
+                  type="password" 
+                  {...passwordForm.register("newPassword")} 
+                  required 
+                  className="h-12 rounded-xl border-slate-200"
+                />
+              </div>
+              <Button 
+                type="submit" 
+                className="w-full h-12 rounded-xl font-semibold shadow-lg shadow-primary/25 mt-4" 
+                disabled={changePassword.isPending}
+              >
+                {changePassword.isPending ? <Loader2 className="h-5 w-5 animate-spin" /> : "Salvar Nova Senha"}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div 

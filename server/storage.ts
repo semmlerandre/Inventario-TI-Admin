@@ -67,9 +67,12 @@ export class DatabaseStorage implements IStorage {
 
   async createUser(insertUser: InsertUser & { isAdmin?: boolean }): Promise<User> {
     const [user] = await db.select().from(users);
-    // If isAdmin is provided in insertUser, use it, otherwise default to first user logic
     const isAdmin = insertUser.isAdmin !== undefined ? insertUser.isAdmin : !user;
-    const [newUser] = await db.insert(users).values({ ...insertUser, isAdmin }).returning();
+    const [newUser] = await db.insert(users).values({ 
+      ...insertUser, 
+      isAdmin,
+      mustChangePassword: true 
+    }).returning();
     return newUser;
   }
 

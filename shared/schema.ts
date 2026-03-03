@@ -9,6 +9,7 @@ export const users = pgTable("users", {
   password: text("password").notNull(),
   isActive: boolean("is_active").notNull().default(true),
   isAdmin: boolean("is_admin").notNull().default(false),
+  mustChangePassword: boolean("must_change_password").notNull().default(false),
 });
 
 export const settings = pgTable("settings", {
