@@ -35,9 +35,13 @@ function UserManagement() {
     mutationFn: async ({ id, updates }: { id: number, updates: any }) => {
       await apiRequest("PATCH", `/api/auth/users/${id}`, updates);
     },
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["/api/auth/users"] });
-      toast({ title: "Sucesso", description: "Usuário atualizado" });
+      if (variables.updates.password) {
+        toast({ title: "Sucesso", description: "Senha redefinida com sucesso!" });
+      } else {
+        toast({ title: "Sucesso", description: "Usuário atualizado" });
+      }
     }
   });
 
@@ -61,7 +65,10 @@ function UserManagement() {
                 size="sm" 
                 onClick={() => {
                   const newPwd = prompt("Nova senha para " + u.username);
-                  if (newPwd) updateMutation.mutate({ id: u.id, updates: { password: newPwd } });
+                  if (newPwd) {
+                    const mustChange = confirm("Forçar alteração de senha no próximo acesso?");
+                    updateMutation.mutate({ id: u.id, updates: { password: newPwd, mustChangePassword: mustChange } });
+                  }
                 }}
               >
                 <RefreshCw className="h-4 w-4 mr-2" /> Reset

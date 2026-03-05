@@ -91,11 +91,12 @@ export async function registerRoutes(
   app.patch("/api/auth/users/:id", requireAuth, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
-      const { isActive, password, isAdmin } = req.body;
+      const { isActive, password, isAdmin, mustChangePassword } = req.body;
       const updates: any = {};
       
       if (isActive !== undefined) updates.isActive = isActive;
       if (isAdmin !== undefined) updates.isAdmin = isAdmin;
+      if (mustChangePassword !== undefined) updates.mustChangePassword = mustChangePassword;
       if (password) {
         updates.password = await hashPassword(password);
       }

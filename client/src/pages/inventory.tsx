@@ -2,11 +2,16 @@ import { useState } from "react";
 import { AppLayout } from "@/components/layout/app-layout";
 import { useItems, useCreateItem, useUpdateItem, useDeleteItem } from "@/hooks/use-items";
 import { useTransactions, useCreateTransaction } from "@/hooks/use-transactions";
-import { Plus, Search, MoreVertical, Edit2, Trash2, ArrowDownToLine, ArrowUpToLine, AlertCircle, Download } from "lucide-react";
+import { Plus, Search, MoreVertical, Edit2, Trash2, ArrowDownToLine, ArrowUpToLine, AlertCircle, Download, ChevronDown, ChevronUp, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -195,7 +200,36 @@ export default function InventoryPage() {
                   filteredItems.map((item) => (
                     <tr key={item.id} className="hover:bg-slate-50/80 transition-colors group">
                       <td className="px-6 py-4 font-medium text-slate-900">
-                        {item.name}
+                        <div className="flex items-center gap-2">
+                          {item.name}
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button variant="ghost" size="sm" className="h-6 w-6 p-0 rounded-full hover:bg-slate-200">
+                                <Users className="h-3 w-3 text-slate-400" />
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-64 p-3 border-none shadow-xl rounded-xl">
+                              <h4 className="font-semibold text-xs uppercase tracking-wider text-slate-500 mb-2">Responsáveis Atuais</h4>
+                              <div className="space-y-2 max-h-40 overflow-y-auto">
+                                {transactions
+                                  .filter(t => t.itemId === item.id && t.type === 'out')
+                                  .length > 0 ? (
+                                    transactions
+                                      .filter(t => t.itemId === item.id && t.type === 'out')
+                                      .map((t, idx) => (
+                                        <div key={idx} className="text-xs bg-slate-50 p-2 rounded-lg border border-slate-100">
+                                          <p className="font-bold text-slate-700">{t.requesterName}</p>
+                                          <p className="text-slate-500">{t.department}</p>
+                                        </div>
+                                      ))
+                                  ) : (
+                                    <p className="text-xs text-slate-400 italic">Nenhum responsável registrado.</p>
+                                  )
+                                }
+                              </div>
+                            </PopoverContent>
+                          </Popover>
+                        </div>
                         <div className="text-xs text-slate-400 mt-1 print-only">
                           {transactions
                             .filter(t => t.itemId === item.id && t.type === 'out')
