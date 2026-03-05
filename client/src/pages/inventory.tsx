@@ -204,11 +204,11 @@ export default function InventoryPage() {
                           {item.name}
                           <Popover>
                             <PopoverTrigger asChild>
-                              <Button variant="ghost" size="sm" className="h-6 w-6 p-0 rounded-full hover:bg-slate-200">
-                                <Users className="h-3 w-3 text-slate-400" />
+                              <Button variant="ghost" size="sm" className="h-8 w-8 p-0 rounded-full hover:bg-slate-200">
+                                <Users className="h-4 w-4 text-slate-400" />
                               </Button>
                             </PopoverTrigger>
-                            <PopoverContent className="w-64 p-3 border-none shadow-xl rounded-xl">
+                            <PopoverContent className="w-64 p-3 border-none shadow-xl rounded-xl" side="right" align="start">
                               <h4 className="font-semibold text-xs uppercase tracking-wider text-slate-500 mb-2">Responsáveis Atuais</h4>
                               <div className="space-y-2 max-h-40 overflow-y-auto">
                                 {transactions
@@ -229,13 +229,6 @@ export default function InventoryPage() {
                               </div>
                             </PopoverContent>
                           </Popover>
-                        </div>
-                        <div className="text-xs text-slate-400 mt-1 print-only">
-                          {transactions
-                            .filter(t => t.itemId === item.id && t.type === 'out')
-                            .map((t, idx) => (
-                              <div key={idx}>{t.requesterName} - {t.department}</div>
-                            ))}
                         </div>
                       </td>
                       <td className="px-6 py-4 text-slate-500">{item.category}</td>
