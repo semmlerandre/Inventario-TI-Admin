@@ -13,6 +13,37 @@ import { pool } from "./db";
 
 const PostgresSessionStore = connectPg(session);
 
+import nodemailer from "nodemailer";
+
+async function sendEmail(settings: Settings, subject: string, text: string) {
+  if (!settings.smtpHost || !settings.smtpUser || !settings.smtpPass) {
+    console.log("[EMAIL] SMTP não configurado. Ignorando envio.");
+    return;
+  }
+
+  try {
+    const transporter = nodemailer.createTransport({
+      host: settings.smtpHost,
+      port: settings.smtpPort || 587,
+      secure: settings.smtpPort === 465,
+      auth: {
+        user: settings.smtpUser,
+        pass: settings.smtpPass,
+      },
+    });
+
+    await transporter.sendMail({
+      from: `"${settings.appName}" <${settings.smtpUser}>`,
+      to: settings.alertEmail || settings.smtpUser,
+      subject,
+      text,
+    });
+    console.log(`[EMAIL] Sucesso: ${subject} enviado para ${settings.alertEmail || settings.smtpUser}`);
+  } catch (error) {
+    console.error("[EMAIL] Erro ao enviar:", error);
+  }
+}
+
 export interface IStorage {
   sessionStore: session.Store;
   
@@ -173,8 +204,10 @@ export class DatabaseStorage implements IStorage {
 
       if (transaction.type === 'out' && newStock <= item.minStock) {
         const settings = await this.getSettings();
-        const alertEmail = settings?.alertEmail || "admin@exemplo.com";
-        console.log(`[EMAIL NOTIFICATION] Enviando alerta para ${alertEmail}: O item ${item.name} atingiu nível crítico de ${newStock} unidades.`);
+        const subject = `Alerta de Estoque Baixo: ${item.name}`;
+        const text = `O item ${item.name} atingiu o nível crítico de ${newStock} unidades (Mínimo: ${item.minStock}).`;
+        
+        await sendEmail(settings, subject, text);
 
         // Mock integration with Teams/Slack
         if (settings?.webhookTeams) {

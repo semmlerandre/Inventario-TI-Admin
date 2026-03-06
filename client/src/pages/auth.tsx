@@ -112,17 +112,25 @@ export default function AuthPage() {
 
   return (
     <div 
-      className="min-h-screen flex items-center justify-center bg-slate-50 relative overflow-hidden"
-      style={(settings?.loginBackgroundData || settings?.loginBackgroundUrl) ? {
-        backgroundImage: `url(${settings.loginBackgroundData || settings.loginBackgroundUrl})`,
-        backgroundSize: 'cover',
-        backgroundPosition: 'center'
-      } : {}}
+      className="min-h-screen flex items-center justify-center bg-slate-100 relative overflow-hidden"
     >
-      {/* Overlay if there is a background image */}
-      {(settings?.loginBackgroundData || settings?.loginBackgroundUrl) && <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" />}
+      {/* Background Image Layer */}
+      {(settings?.loginBackgroundData || settings?.loginBackgroundUrl) && (
+        <div 
+          className="absolute inset-0 z-0"
+          style={{
+            backgroundImage: `url(${settings.loginBackgroundData || settings.loginBackgroundUrl})`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            backgroundRepeat: 'no-repeat'
+          }}
+        />
+      )}
       
-      <div className="sm:mx-auto sm:w-full sm:max-w-md relative z-10">
+      {/* Overlay if there is a background image */}
+      {(settings?.loginBackgroundData || settings?.loginBackgroundUrl) && <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-[2px] z-0" />}
+      
+      <div className="sm:mx-auto sm:w-full sm:max-w-md relative z-10 px-4">
         <div className="flex flex-col items-center mb-8">
           <div className="h-16 w-16 bg-white shadow-xl shadow-primary/10 rounded-2xl flex items-center justify-center mb-6">
             {(settings?.logoData || settings?.logoUrl) ? (

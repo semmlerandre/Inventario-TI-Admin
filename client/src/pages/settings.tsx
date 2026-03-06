@@ -424,6 +424,22 @@ export default function SettingsPage() {
                         <FormItem><FormLabel>Senha</FormLabel><FormControl><Input type="password" {...field} value={field.value || ''} /></FormControl></FormItem>
                       )} />
                     </div>
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      size="sm" 
+                      className="w-full mt-2"
+                      onClick={async () => {
+                        try {
+                          const res = await apiRequest("POST", "/api/settings/test-email", {});
+                          toast({ title: "Sucesso", description: "E-mail de teste enviado!" });
+                        } catch (err: any) {
+                          toast({ title: "Erro", description: err.message, variant: "destructive" });
+                        }
+                      }}
+                    >
+                      Testar Envio de E-mail
+                    </Button>
                   </div>
 
                   <div className="space-y-4 pt-4 border-t border-slate-100">

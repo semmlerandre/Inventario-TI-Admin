@@ -5,6 +5,7 @@ import { api } from "@shared/routes";
 import { z } from "zod";
 import { setupAuth, hashPassword, comparePasswords } from "./auth";
 import passport from "passport";
+import nodemailer from "nodemailer";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -140,6 +141,36 @@ export async function registerRoutes(
         return res.status(400).json({ message: err.errors[0].message, field: err.errors[0].path.join('.') });
       }
       res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.post("/api/settings/test-email", requireAuth, async (req, res) => {
+    try {
+      const settings = await storage.getSettings();
+      if (!settings.smtpHost || !settings.smtpUser || !settings.smtpPass) {
+        return res.status(400).json({ message: "SMTP não configurado" });
+      }
+
+      const transporter = nodemailer.createTransport({
+        host: settings.smtpHost,
+        port: settings.smtpPort || 587,
+        secure: settings.smtpPort === 465,
+        auth: {
+          user: settings.smtpUser,
+          pass: settings.smtpPass,
+        },
+      });
+
+      await transporter.sendMail({
+        from: `"${settings.appName}" <${settings.smtpUser}>`,
+        to: settings.alertEmail || settings.smtpUser,
+        subject: "Teste de Configuração de E-mail",
+        text: "Este é um e-mail de teste do sistema de inventário. Suas configurações SMTP estão corretas!",
+      });
+
+      res.json({ message: "E-mail de teste enviado com sucesso" });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || "Erro ao enviar e-mail de teste" });
     }
   });
 
