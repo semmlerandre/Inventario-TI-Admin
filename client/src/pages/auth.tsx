@@ -23,10 +23,11 @@ import {
 } from "@/components/ui/form";
 
 export default function AuthPage() {
-  const { login, isLoggingIn, user } = useAuth();
+  const { login, isLoggingIn, user, logout } = useAuth();
   const { data: settings } = useSettings();
   const [, setLocation] = useLocation();
   const [showPasswordChange, setShowPasswordChange] = useState(false);
+  const { toast } = useToast();
 
   const form = useRHForm<z.infer<typeof api.auth.login.input>>({
     resolver: zodResolver(api.auth.login.input),
@@ -41,9 +42,9 @@ export default function AuthPage() {
       await apiRequest("POST", "/api/auth/change-password", values);
     },
     onSuccess: () => {
-      toast({ title: "Sucesso", description: "Senha alterada com sucesso!" });
+      toast({ title: "Sucesso", description: "Senha alterada com sucesso! Faça login novamente." });
       setShowPasswordChange(false);
-      window.location.reload(); // Refresh to update user state
+      logout();
     },
     onError: (err: any) => {
       toast({ title: "Erro", description: err.message, variant: "destructive" });
