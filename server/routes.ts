@@ -166,6 +166,24 @@ export async function registerRoutes(
         to: settings.alertEmail || settings.smtpUser,
         subject: "Teste de Configuração de E-mail",
         text: "Este é um e-mail de teste do sistema de inventário. Suas configurações SMTP estão corretas!",
+        html: `
+          <div style="font-family: sans-serif; padding: 20px; color: #2d3748; max-width: 600px; margin: auto; border: 1px solid #e2e8f0; border-radius: 8px;">
+            <div style="background-color: ${settings.primaryColor || '#0ea5e9'}; padding: 20px; border-radius: 8px 8px 0 0; text-align: center;">
+              <h1 style="color: white; margin: 0;">${settings.appName || 'TI Inventory'}</h1>
+            </div>
+            <div style="padding: 20px;">
+              <h2 style="color: #1a202c;">Teste de Configuração</h2>
+              <p>Este é um e-mail de teste do sistema de inventário. Suas configurações SMTP estão corretas e o sistema está pronto para enviar notificações!</p>
+              <div style="background-color: #f7fafc; padding: 15px; border-radius: 4px; border-left: 4px solid #48bb78;">
+                <p style="margin: 0; color: #2f855a; font-weight: bold;">Sucesso!</p>
+                <p style="margin: 0; font-size: 14px;">O sistema de alertas foi configurado corretamente.</p>
+              </div>
+            </div>
+            <div style="text-align: center; padding: 20px; color: #a0aec0; font-size: 12px;">
+              &copy; ${new Date().getFullYear()} ${settings.appName || 'TI Inventory'}
+            </div>
+          </div>
+        `
       });
 
       res.json({ message: "E-mail de teste enviado com sucesso" });
