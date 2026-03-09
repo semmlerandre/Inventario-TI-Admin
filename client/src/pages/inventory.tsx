@@ -119,20 +119,32 @@ export default function InventoryPage() {
   };
 
   const downloadXLSX = () => {
-    let content = "\uFEFFNome\tCategoria\tEstoque Atual\tStatus\tUsuários / Detalhes\n";
+    // Para resolver o problema de "formato não esperado" no Excel,
+    // vamos gerar um arquivo XML que o Excel reconhece como uma planilha nativa (SpreadsheetML)
+    // ou apenas usar um CSV com o separador correto e BOM para UTF-8.
+    // Usar tabulação (\t) em um .xls às vezes falha dependendo da versão.
+    // Vamos mudar para um CSV real com ponto e vírgula (comum no Brasil) e extensão .csv
+    
+    let content = "\uFEFFNome;Categoria;Estoque Atual;Status;Usuários / Detalhes\n";
     filteredItems.forEach(item => {
       const status = item.stock <= item.minStock ? "Baixo" : "Normal";
       const holders = transactions
         .filter(t => t.itemId === item.id && t.type === 'out')
         .map(t => `${t.requesterName} (${t.department || 'N/A'})`)
         .join(" | ");
-      content += `${item.name}\t${item.category}\t${item.stock}\t${status}\t${holders}\n`;
+      // Escapar possíveis pontos e vírgulas no nome ou categoria para não quebrar o CSV
+      const name = item.name.replace(/;/g, ",");
+      const category = item.category.replace(/;/g, ",");
+      const safeHolders = holders.replace(/;/g, ",");
+      
+      content += `${name};${category};${item.stock};${status};${safeHolders}\n`;
     });
-    const blob = new Blob([content], { type: 'application/vnd.ms-excel;charset=utf-8;' });
+    
+    const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement("a");
     const url = URL.createObjectURL(blob);
     link.setAttribute("href", url);
-    link.setAttribute("download", "estoque.xls");
+    link.setAttribute("download", `estoque_${new Date().toLocaleDateString()}.csv`);
     link.style.visibility = 'hidden';
     document.body.appendChild(link);
     link.click();

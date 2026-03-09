@@ -111,16 +111,18 @@ export default function AuthPage() {
     );
   }
 
+  const bgImage = settings?.loginBackgroundData || settings?.loginBackgroundUrl;
+
   return (
     <div 
       className="min-h-screen flex items-center justify-center bg-slate-100 relative overflow-hidden"
     >
       {/* Background Image Layer */}
-      {(settings?.loginBackgroundData || settings?.loginBackgroundUrl) && (
+      {bgImage && (
         <div 
           className="absolute inset-0 z-0"
           style={{
-            backgroundImage: `url(${settings.loginBackgroundData || settings.loginBackgroundUrl})`,
+            backgroundImage: `url(${bgImage})`,
             backgroundSize: 'cover',
             backgroundPosition: 'center',
             backgroundRepeat: 'no-repeat'
@@ -129,7 +131,7 @@ export default function AuthPage() {
       )}
       
       {/* Overlay if there is a background image */}
-      {(settings?.loginBackgroundData || settings?.loginBackgroundUrl) && <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-[2px] z-0" />}
+      {bgImage && <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-[2px] z-0" />}
       
       <div className="sm:mx-auto sm:w-full sm:max-w-md relative z-10 px-4">
         <div className="flex flex-col items-center mb-8">

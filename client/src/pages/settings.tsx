@@ -378,7 +378,7 @@ export default function SettingsPage() {
                                 </Button>
                               )}
                             </div>
-                            <p className="text-[10px] text-slate-400">Formatos aceitos: PNG, JPG, SVG (Máx 2MB)</p>
+                            <p className="text-[10px] text-slate-400">Formatos aceitos: PNG, JPG, JPEG, SVG, GIF (Máx 50MB)</p>
                           </div>
                         </div>
                         <div className="space-y-1">
