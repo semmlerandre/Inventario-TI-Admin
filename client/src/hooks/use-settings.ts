@@ -4,6 +4,28 @@ import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
 import { applyThemeColor } from "@/lib/color-utils";
 
+function updateFavicon(logoData: string | null | undefined) {
+  if (!logoData) {
+    // Reset to default favicon
+    const link = document.querySelector("link[rel='icon']") as HTMLLinkElement;
+    if (link) {
+      link.href = "/favicon.png";
+    }
+    return;
+  }
+  
+  // Update favicon with the logo image
+  let link = document.querySelector("link[rel='icon']") as HTMLLinkElement;
+  if (!link) {
+    link = document.createElement("link");
+    link.rel = "icon";
+    document.head.appendChild(link);
+  }
+  
+  link.type = "image/png";
+  link.href = logoData;
+}
+
 export function useSettings() {
   return useQuery({
     queryKey: [api.settings.get.path],
@@ -15,6 +37,11 @@ export function useSettings() {
       // Inject theme color on fetch
       if (data?.primaryColor) {
         applyThemeColor(data.primaryColor);
+      }
+      
+      // Update favicon on fetch
+      if (data?.logoData) {
+        updateFavicon(data.logoData);
       }
       
       return data;
@@ -40,6 +67,7 @@ export function useUpdateSettings() {
     onSuccess: (data) => {
       queryClient.setQueryData([api.settings.get.path], data);
       if (data.primaryColor) applyThemeColor(data.primaryColor);
+      if (data.logoData) updateFavicon(data.logoData);
       toast({ title: "Configurações salvas!" });
     },
     onError: () => {
