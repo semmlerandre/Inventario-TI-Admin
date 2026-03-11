@@ -4,7 +4,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useAuth } from "./hooks/use-auth";
-import { useSettings } from "./hooks/use-settings"; // Need this at root to trigger theme injection
+import { useSettings } from "./hooks/use-settings";
 import NotFound from "@/pages/not-found";
 
 // Pages
@@ -13,6 +13,16 @@ import DashboardPage from "./pages/dashboard";
 import InventoryPage from "./pages/inventory";
 import TransactionsPage from "./pages/transactions";
 import SettingsPage from "./pages/settings";
+
+// Telefonia Móvel
+import TelefoniaIndexPage from "./pages/telefonia/index";
+import OperadorasPage from "./pages/telefonia/operadoras";
+import PlanosPage from "./pages/telefonia/planos";
+import ChipsPage from "./pages/telefonia/chips";
+import AparelhosPage from "./pages/telefonia/aparelhos";
+import LinhasPage from "./pages/telefonia/linhas";
+import MovimentacoesPage from "./pages/telefonia/movimentacoes";
+import RelatoriosPage from "./pages/telefonia/relatorios";
 
 function ProtectedRoute({ component: Component, ...rest }: any) {
   const { user, isLoading } = useAuth();
@@ -29,7 +39,6 @@ function ProtectedRoute({ component: Component, ...rest }: any) {
 }
 
 function Router() {
-  // Call useSettings here so it fetches once and injects the theme color on load
   useSettings();
 
   return (
@@ -46,6 +55,31 @@ function Router() {
       </Route>
       <Route path="/configuracoes">
         <ProtectedRoute component={SettingsPage} />
+      </Route>
+      {/* Telefonia Móvel */}
+      <Route path="/telefonia">
+        <ProtectedRoute component={TelefoniaIndexPage} />
+      </Route>
+      <Route path="/telefonia/operadoras">
+        <ProtectedRoute component={OperadorasPage} />
+      </Route>
+      <Route path="/telefonia/planos">
+        <ProtectedRoute component={PlanosPage} />
+      </Route>
+      <Route path="/telefonia/chips">
+        <ProtectedRoute component={ChipsPage} />
+      </Route>
+      <Route path="/telefonia/aparelhos">
+        <ProtectedRoute component={AparelhosPage} />
+      </Route>
+      <Route path="/telefonia/linhas">
+        <ProtectedRoute component={LinhasPage} />
+      </Route>
+      <Route path="/telefonia/movimentacoes">
+        <ProtectedRoute component={MovimentacoesPage} />
+      </Route>
+      <Route path="/telefonia/relatorios">
+        <ProtectedRoute component={RelatoriosPage} />
       </Route>
       <Route component={NotFound} />
     </Switch>
