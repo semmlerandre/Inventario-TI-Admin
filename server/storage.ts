@@ -1,10 +1,17 @@
 import { db } from "./db";
 import {
   users, settings, items, transactions,
+  mobileCarriers, mobilePlans, mobileChips, mobileDevices, mobileLines, mobileLineMovements,
   type User, type InsertUser,
   type Settings, type InsertSettings, type UpdateSettingsRequest,
   type Item, type InsertItem, type UpdateItemRequest,
-  type Transaction, type InsertTransaction
+  type Transaction, type InsertTransaction,
+  type MobileCarrier, type InsertMobileCarrier,
+  type MobilePlan, type InsertMobilePlan,
+  type MobileChip, type InsertMobileChip,
+  type MobileDevice, type InsertMobileDevice,
+  type MobileLine, type InsertMobileLine,
+  type MobileLineMovement, type InsertMobileLineMovement,
 } from "@shared/schema";
 import { eq, desc, not } from "drizzle-orm";
 import session from "express-session";
@@ -122,6 +129,45 @@ export interface IStorage {
   // Transactions
   getTransactions(): Promise<(Transaction & { item: Item })[]>;
   createTransaction(transaction: InsertTransaction): Promise<Transaction>;
+
+  // Mobile - Carriers
+  getMobileCarriers(): Promise<MobileCarrier[]>;
+  getMobileCarrier(id: number): Promise<MobileCarrier | undefined>;
+  createMobileCarrier(data: InsertMobileCarrier): Promise<MobileCarrier>;
+  updateMobileCarrier(id: number, data: Partial<InsertMobileCarrier>): Promise<MobileCarrier>;
+  deleteMobileCarrier(id: number): Promise<void>;
+
+  // Mobile - Plans
+  getMobilePlans(): Promise<(MobilePlan & { carrier: MobileCarrier })[]>;
+  getMobilePlan(id: number): Promise<MobilePlan | undefined>;
+  createMobilePlan(data: InsertMobilePlan): Promise<MobilePlan>;
+  updateMobilePlan(id: number, data: Partial<InsertMobilePlan>): Promise<MobilePlan>;
+  deleteMobilePlan(id: number): Promise<void>;
+
+  // Mobile - Chips
+  getMobileChips(): Promise<(MobileChip & { carrier: MobileCarrier })[]>;
+  getMobileChip(id: number): Promise<MobileChip | undefined>;
+  createMobileChip(data: InsertMobileChip): Promise<MobileChip>;
+  updateMobileChip(id: number, data: Partial<InsertMobileChip>): Promise<MobileChip>;
+  deleteMobileChip(id: number): Promise<void>;
+
+  // Mobile - Devices
+  getMobileDevices(): Promise<MobileDevice[]>;
+  getMobileDevice(id: number): Promise<MobileDevice | undefined>;
+  createMobileDevice(data: InsertMobileDevice): Promise<MobileDevice>;
+  updateMobileDevice(id: number, data: Partial<InsertMobileDevice>): Promise<MobileDevice>;
+  deleteMobileDevice(id: number): Promise<void>;
+
+  // Mobile - Lines
+  getMobileLines(): Promise<any[]>;
+  getMobileLine(id: number): Promise<any | undefined>;
+  createMobileLine(data: InsertMobileLine): Promise<MobileLine>;
+  updateMobileLine(id: number, data: Partial<InsertMobileLine>): Promise<MobileLine>;
+  deleteMobileLine(id: number): Promise<void>;
+
+  // Mobile - Movements
+  getMobileLineMovements(lineId?: number): Promise<(MobileLineMovement & { line: MobileLine })[]>;
+  createMobileLineMovement(data: InsertMobileLineMovement): Promise<MobileLineMovement>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -175,7 +221,6 @@ export class DatabaseStorage implements IStorage {
   async getSettings(): Promise<Settings> {
     const [setting] = await db.select().from(settings).limit(1);
     if (!setting) {
-      // Return a default object matching the Settings type if no record exists yet
       return {
         id: 0,
         logoUrl: null,
@@ -247,7 +292,6 @@ export class DatabaseStorage implements IStorage {
   async createTransaction(transaction: InsertTransaction): Promise<Transaction> {
     const [newTransaction] = await db.insert(transactions).values(transaction).returning();
     
-    // Update stock
     const item = await this.getItem(transaction.itemId);
     if (item) {
       const quantityChange = transaction.type === 'in' ? transaction.quantity : -transaction.quantity;
@@ -274,7 +318,6 @@ export class DatabaseStorage implements IStorage {
         
         await sendEmail(settings, subject, message, html);
 
-        // Mock integration with Teams/Slack
         if (settings?.webhookTeams) {
           console.log(`[TEAMS NOTIFICATION] Enviando para ${settings.webhookTeams}: Estoque baixo para ${item.name}`);
         }
@@ -285,6 +328,201 @@ export class DatabaseStorage implements IStorage {
     }
 
     return newTransaction;
+  }
+
+  // ==================== MOBILE CARRIERS ====================
+
+  async getMobileCarriers(): Promise<MobileCarrier[]> {
+    return await db.select().from(mobileCarriers).orderBy(mobileCarriers.name);
+  }
+
+  async getMobileCarrier(id: number): Promise<MobileCarrier | undefined> {
+    const [carrier] = await db.select().from(mobileCarriers).where(eq(mobileCarriers.id, id));
+    return carrier;
+  }
+
+  async createMobileCarrier(data: InsertMobileCarrier): Promise<MobileCarrier> {
+    const [carrier] = await db.insert(mobileCarriers).values(data).returning();
+    return carrier;
+  }
+
+  async updateMobileCarrier(id: number, data: Partial<InsertMobileCarrier>): Promise<MobileCarrier> {
+    const [updated] = await db.update(mobileCarriers).set(data).where(eq(mobileCarriers.id, id)).returning();
+    return updated;
+  }
+
+  async deleteMobileCarrier(id: number): Promise<void> {
+    await db.delete(mobileCarriers).where(eq(mobileCarriers.id, id));
+  }
+
+  // ==================== MOBILE PLANS ====================
+
+  async getMobilePlans(): Promise<(MobilePlan & { carrier: MobileCarrier })[]> {
+    const results = await db.select({
+      plan: mobilePlans,
+      carrier: mobileCarriers,
+    }).from(mobilePlans)
+      .leftJoin(mobileCarriers, eq(mobilePlans.carrierId, mobileCarriers.id))
+      .orderBy(mobilePlans.name);
+    
+    return results.map(r => ({ ...r.plan, carrier: r.carrier! }));
+  }
+
+  async getMobilePlan(id: number): Promise<MobilePlan | undefined> {
+    const [plan] = await db.select().from(mobilePlans).where(eq(mobilePlans.id, id));
+    return plan;
+  }
+
+  async createMobilePlan(data: InsertMobilePlan): Promise<MobilePlan> {
+    const [plan] = await db.insert(mobilePlans).values(data).returning();
+    return plan;
+  }
+
+  async updateMobilePlan(id: number, data: Partial<InsertMobilePlan>): Promise<MobilePlan> {
+    const [updated] = await db.update(mobilePlans).set(data).where(eq(mobilePlans.id, id)).returning();
+    return updated;
+  }
+
+  async deleteMobilePlan(id: number): Promise<void> {
+    await db.delete(mobilePlans).where(eq(mobilePlans.id, id));
+  }
+
+  // ==================== MOBILE CHIPS ====================
+
+  async getMobileChips(): Promise<(MobileChip & { carrier: MobileCarrier })[]> {
+    const results = await db.select({
+      chip: mobileChips,
+      carrier: mobileCarriers,
+    }).from(mobileChips)
+      .leftJoin(mobileCarriers, eq(mobileChips.carrierId, mobileCarriers.id))
+      .orderBy(desc(mobileChips.createdAt));
+    
+    return results.map(r => ({ ...r.chip, carrier: r.carrier! }));
+  }
+
+  async getMobileChip(id: number): Promise<MobileChip | undefined> {
+    const [chip] = await db.select().from(mobileChips).where(eq(mobileChips.id, id));
+    return chip;
+  }
+
+  async createMobileChip(data: InsertMobileChip): Promise<MobileChip> {
+    const [chip] = await db.insert(mobileChips).values(data).returning();
+    return chip;
+  }
+
+  async updateMobileChip(id: number, data: Partial<InsertMobileChip>): Promise<MobileChip> {
+    const [updated] = await db.update(mobileChips).set(data).where(eq(mobileChips.id, id)).returning();
+    return updated;
+  }
+
+  async deleteMobileChip(id: number): Promise<void> {
+    await db.delete(mobileChips).where(eq(mobileChips.id, id));
+  }
+
+  // ==================== MOBILE DEVICES ====================
+
+  async getMobileDevices(): Promise<MobileDevice[]> {
+    return await db.select().from(mobileDevices).orderBy(desc(mobileDevices.createdAt));
+  }
+
+  async getMobileDevice(id: number): Promise<MobileDevice | undefined> {
+    const [device] = await db.select().from(mobileDevices).where(eq(mobileDevices.id, id));
+    return device;
+  }
+
+  async createMobileDevice(data: InsertMobileDevice): Promise<MobileDevice> {
+    const [device] = await db.insert(mobileDevices).values(data).returning();
+    return device;
+  }
+
+  async updateMobileDevice(id: number, data: Partial<InsertMobileDevice>): Promise<MobileDevice> {
+    const [updated] = await db.update(mobileDevices).set(data).where(eq(mobileDevices.id, id)).returning();
+    return updated;
+  }
+
+  async deleteMobileDevice(id: number): Promise<void> {
+    await db.delete(mobileDevices).where(eq(mobileDevices.id, id));
+  }
+
+  // ==================== MOBILE LINES ====================
+
+  async getMobileLines(): Promise<any[]> {
+    const results = await db.select({
+      line: mobileLines,
+      carrier: mobileCarriers,
+      plan: mobilePlans,
+      chip: mobileChips,
+      device: mobileDevices,
+    }).from(mobileLines)
+      .leftJoin(mobileCarriers, eq(mobileLines.carrierId, mobileCarriers.id))
+      .leftJoin(mobilePlans, eq(mobileLines.planId, mobilePlans.id))
+      .leftJoin(mobileChips, eq(mobileLines.chipId, mobileChips.id))
+      .leftJoin(mobileDevices, eq(mobileLines.deviceId, mobileDevices.id))
+      .orderBy(mobileLines.number);
+    
+    return results.map(r => ({
+      ...r.line,
+      carrier: r.carrier,
+      plan: r.plan,
+      chip: r.chip,
+      device: r.device,
+    }));
+  }
+
+  async getMobileLine(id: number): Promise<any | undefined> {
+    const results = await db.select({
+      line: mobileLines,
+      carrier: mobileCarriers,
+      plan: mobilePlans,
+      chip: mobileChips,
+      device: mobileDevices,
+    }).from(mobileLines)
+      .leftJoin(mobileCarriers, eq(mobileLines.carrierId, mobileCarriers.id))
+      .leftJoin(mobilePlans, eq(mobileLines.planId, mobilePlans.id))
+      .leftJoin(mobileChips, eq(mobileLines.chipId, mobileChips.id))
+      .leftJoin(mobileDevices, eq(mobileLines.deviceId, mobileDevices.id))
+      .where(eq(mobileLines.id, id));
+    
+    if (!results[0]) return undefined;
+    const r = results[0];
+    return { ...r.line, carrier: r.carrier, plan: r.plan, chip: r.chip, device: r.device };
+  }
+
+  async createMobileLine(data: InsertMobileLine): Promise<MobileLine> {
+    const [line] = await db.insert(mobileLines).values(data).returning();
+    return line;
+  }
+
+  async updateMobileLine(id: number, data: Partial<InsertMobileLine>): Promise<MobileLine> {
+    const [updated] = await db.update(mobileLines).set(data).where(eq(mobileLines.id, id)).returning();
+    return updated;
+  }
+
+  async deleteMobileLine(id: number): Promise<void> {
+    await db.delete(mobileLines).where(eq(mobileLines.id, id));
+  }
+
+  // ==================== MOBILE MOVEMENTS ====================
+
+  async getMobileLineMovements(lineId?: number): Promise<(MobileLineMovement & { line: MobileLine })[]> {
+    let query = db.select({
+      movement: mobileLineMovements,
+      line: mobileLines,
+    }).from(mobileLineMovements)
+      .leftJoin(mobileLines, eq(mobileLineMovements.lineId, mobileLines.id))
+      .$dynamic();
+
+    if (lineId) {
+      query = query.where(eq(mobileLineMovements.lineId, lineId));
+    }
+
+    const results = await query.orderBy(desc(mobileLineMovements.createdAt));
+    return results.map(r => ({ ...r.movement, line: r.line! }));
+  }
+
+  async createMobileLineMovement(data: InsertMobileLineMovement): Promise<MobileLineMovement> {
+    const [movement] = await db.insert(mobileLineMovements).values(data).returning();
+    return movement;
   }
 }
 

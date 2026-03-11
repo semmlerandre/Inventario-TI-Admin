@@ -1,0 +1,437 @@
+Objetivo do Sistema
+
+Desenvolver um sistema web para gestão de linhas móveis corporativas, permitindo controlar:
+
+Linhas telefônicas
+
+Chips (SIM / eSIM)
+
+Aparelhos celulares
+
+Operadoras
+
+Planos
+
+Colaboradores responsáveis
+
+Solicitações de linhas
+
+Número de chamados
+
+Histórico de movimentações
+
+Custos mensais
+
+O sistema deve permitir rastreabilidade completa de cada linha, incluindo:
+
+quem solicitou
+
+quem está utilizando
+
+histórico de alterações
+
+número do chamado relacionado
+
+2. Tipos de Usuários
+Administrador
+
+Permissões completas:
+
+Gerenciar operadoras
+
+Gerenciar planos
+
+Gerenciar chips
+
+Gerenciar linhas
+
+Gerenciar dispositivos
+
+Gerenciar colaboradores
+
+Gerenciar configurações do sistema
+
+Visualizar relatórios
+
+Exportar dados
+
+Visualizar histórico completo
+
+Usuário TI
+
+Permissões:
+
+Cadastrar linhas
+
+Vincular linhas a usuários
+
+Trocar aparelhos
+
+Registrar movimentações
+
+Consultar relatórios
+
+Auditor / Financeiro
+
+Permissões somente leitura:
+
+Relatórios
+
+Custos
+
+Histórico
+
+3. Cadastro de Operadoras
+
+Campos:
+
+Nome
+
+CNPJ
+
+Contato comercial
+
+Email
+
+Telefone
+
+Observações
+
+4. Cadastro de Planos
+
+Campos:
+
+Operadora
+
+Nome do plano
+
+Tipo
+
+Tipos:
+
+Voz
+
+Dados
+
+Voz + Dados
+
+Outros campos:
+
+Franquia de dados
+
+Minutos
+
+Valor mensal
+
+Observações
+
+5. Cadastro de Chips
+
+Campos:
+
+ICCID
+
+Operadora
+
+Tipo
+
+Tipos:
+
+SIM
+
+eSIM
+
+Status:
+
+Disponível
+
+Em uso
+
+Cancelado
+
+Campos adicionais:
+
+Data de ativação
+
+Observações
+
+6. Cadastro de Linhas Telefônicas
+
+Campos:
+
+Número da linha
+
+Operadora
+
+Plano
+
+Chip vinculado
+
+Status
+
+Status:
+
+Ativa
+
+Suspensa
+
+Cancelada
+
+Em estoque
+
+7. Cadastro de Aparelhos
+
+Campos:
+
+Marca
+
+Modelo
+
+IMEI
+
+Data de aquisição
+
+Status
+
+Status:
+
+Disponível
+
+Em uso
+
+Manutenção
+
+Descartado
+
+
+9. Controle de Responsabilidade da Linha
+
+Cada linha deve possuir um responsável atual.
+
+Campos adicionais:
+
+Colaborador responsável
+
+Departamento
+
+Data de entrega
+
+Responsável pela entrega
+
+10. Registro de Solicitação
+
+Campos:
+
+Solicitado por
+
+Departamento solicitante
+
+Data da solicitação
+
+Motivo da solicitação
+
+Exemplos:
+
+Novo colaborador
+
+Substituição
+
+Projeto
+
+Linha temporária
+
+Linha de plantão
+
+11. Número do Chamado
+
+Campo numero do chamado
+
+Esse campo deve existir em:
+
+criação de linha
+
+movimentações
+
+trocas de usuário
+
+cancelamentos
+
+12. Tela de Movimentação de Linha
+
+Ações possíveis:
+
+Entregar linha
+
+Trocar usuário
+
+Trocar chip
+
+Trocar aparelho
+
+Suspender linha
+
+Cancelar linha
+
+Campos obrigatórios:
+
+Linha
+
+Usuário destino
+
+Solicitado por
+
+Número do chamado
+
+Motivo
+
+Observações
+
+Responsável pela alteração
+
+13. Histórico de Movimentações
+
+Campos:
+
+Linha
+
+Tipo de evento
+
+Usuário anterior
+
+Usuário novo
+
+Número do chamado
+
+Solicitante
+
+Responsável TI
+
+Data
+
+Observações
+
+Eventos possíveis:
+
+Entrega de linha
+
+Troca de usuário
+
+Troca de chip
+
+Troca de aparelho
+
+Mudança de plano
+
+Cancelamento
+
+14. Dashboard
+
+Indicadores:
+
+Total de linhas ativas
+
+Linhas por operadora
+
+Linhas por departamento
+
+Chips disponíveis
+
+Dispositivos disponíveis
+
+
+Gráficos:
+
+Linhas por operadora
+
+15. Relatórios
+Relatório de Linhas
+
+Campos:
+
+Linha
+
+Usuário
+
+Departamento
+
+Operadora
+
+Dispositivo
+
+Data de entrega
+
+Número do chamado
+
+Filtros:
+
+Operadora
+
+Departamento
+
+Usuário
+
+Status
+
+Relatório de Inventário
+
+Chips disponíveis
+
+Aparelhos disponíveis
+
+Linhas não utilizadas
+
+Relatório de Custos
+
+Campos:
+
+Linha
+
+Operadora
+
+Relatório de Histórico
+
+Campos:
+
+Linha
+
+Evento
+
+Usuário anterior
+
+Usuário novo
+
+Número do chamado
+
+Responsável TI
+
+Data
+
+16. Exportação de Relatórios
+
+Formatos:
+
+CSV
+
+Excel
+
+PDF
+
+17. Requisitos CSV
+
+Todos os relatórios CSV devem:
+
+utilizar UTF-8
+
+incluir BOM
+
+utilizar separador ;
+
+utilizar quebra de linha CRLF
+
+Compatível com:
+
+Excel
+
+LibreOffice
+
+Google Sheets

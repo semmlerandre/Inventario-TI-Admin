@@ -252,6 +252,224 @@ export async function registerRoutes(
     }
   });
 
+  // ==================== MOBILE - CARRIERS ====================
+  app.get("/api/mobile/carriers", requireAuth, async (req, res) => {
+    const carriers = await storage.getMobileCarriers();
+    res.json(carriers);
+  });
+
+  app.post("/api/mobile/carriers", requireAuth, async (req, res) => {
+    try {
+      const carrier = await storage.createMobileCarrier(req.body);
+      res.status(201).json(carrier);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || "Erro ao criar operadora" });
+    }
+  });
+
+  app.patch("/api/mobile/carriers/:id", requireAuth, async (req, res) => {
+    try {
+      const carrier = await storage.updateMobileCarrier(Number(req.params.id), req.body);
+      res.json(carrier);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || "Erro ao atualizar operadora" });
+    }
+  });
+
+  app.delete("/api/mobile/carriers/:id", requireAuth, async (req, res) => {
+    await storage.deleteMobileCarrier(Number(req.params.id));
+    res.status(204).end();
+  });
+
+  // ==================== MOBILE - PLANS ====================
+  app.get("/api/mobile/plans", requireAuth, async (req, res) => {
+    const plans = await storage.getMobilePlans();
+    res.json(plans);
+  });
+
+  app.post("/api/mobile/plans", requireAuth, async (req, res) => {
+    try {
+      const plan = await storage.createMobilePlan(req.body);
+      res.status(201).json(plan);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || "Erro ao criar plano" });
+    }
+  });
+
+  app.patch("/api/mobile/plans/:id", requireAuth, async (req, res) => {
+    try {
+      const plan = await storage.updateMobilePlan(Number(req.params.id), req.body);
+      res.json(plan);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || "Erro ao atualizar plano" });
+    }
+  });
+
+  app.delete("/api/mobile/plans/:id", requireAuth, async (req, res) => {
+    await storage.deleteMobilePlan(Number(req.params.id));
+    res.status(204).end();
+  });
+
+  // ==================== MOBILE - CHIPS ====================
+  app.get("/api/mobile/chips", requireAuth, async (req, res) => {
+    const chips = await storage.getMobileChips();
+    res.json(chips);
+  });
+
+  app.post("/api/mobile/chips", requireAuth, async (req, res) => {
+    try {
+      const chip = await storage.createMobileChip(req.body);
+      res.status(201).json(chip);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || "Erro ao criar chip" });
+    }
+  });
+
+  app.patch("/api/mobile/chips/:id", requireAuth, async (req, res) => {
+    try {
+      const chip = await storage.updateMobileChip(Number(req.params.id), req.body);
+      res.json(chip);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || "Erro ao atualizar chip" });
+    }
+  });
+
+  app.delete("/api/mobile/chips/:id", requireAuth, async (req, res) => {
+    await storage.deleteMobileChip(Number(req.params.id));
+    res.status(204).end();
+  });
+
+  // ==================== MOBILE - DEVICES ====================
+  app.get("/api/mobile/devices", requireAuth, async (req, res) => {
+    const devices = await storage.getMobileDevices();
+    res.json(devices);
+  });
+
+  app.post("/api/mobile/devices", requireAuth, async (req, res) => {
+    try {
+      const device = await storage.createMobileDevice(req.body);
+      res.status(201).json(device);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || "Erro ao criar aparelho" });
+    }
+  });
+
+  app.patch("/api/mobile/devices/:id", requireAuth, async (req, res) => {
+    try {
+      const device = await storage.updateMobileDevice(Number(req.params.id), req.body);
+      res.json(device);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || "Erro ao atualizar aparelho" });
+    }
+  });
+
+  app.delete("/api/mobile/devices/:id", requireAuth, async (req, res) => {
+    await storage.deleteMobileDevice(Number(req.params.id));
+    res.status(204).end();
+  });
+
+  // ==================== MOBILE - LINES ====================
+  app.get("/api/mobile/lines", requireAuth, async (req, res) => {
+    const lines = await storage.getMobileLines();
+    res.json(lines);
+  });
+
+  app.get("/api/mobile/lines/:id", requireAuth, async (req, res) => {
+    const line = await storage.getMobileLine(Number(req.params.id));
+    if (!line) return res.status(404).json({ message: "Linha não encontrada" });
+    res.json(line);
+  });
+
+  app.post("/api/mobile/lines", requireAuth, async (req, res) => {
+    try {
+      const line = await storage.createMobileLine(req.body);
+      res.status(201).json(line);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || "Erro ao criar linha" });
+    }
+  });
+
+  app.patch("/api/mobile/lines/:id", requireAuth, async (req, res) => {
+    try {
+      const line = await storage.updateMobileLine(Number(req.params.id), req.body);
+      res.json(line);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || "Erro ao atualizar linha" });
+    }
+  });
+
+  app.delete("/api/mobile/lines/:id", requireAuth, async (req, res) => {
+    await storage.deleteMobileLine(Number(req.params.id));
+    res.status(204).end();
+  });
+
+  // ==================== MOBILE - MOVEMENTS ====================
+  app.get("/api/mobile/movements", requireAuth, async (req, res) => {
+    const lineId = req.query.lineId ? Number(req.query.lineId) : undefined;
+    const movements = await storage.getMobileLineMovements(lineId);
+    res.json(movements);
+  });
+
+  app.post("/api/mobile/movements", requireAuth, async (req, res) => {
+    try {
+      const movement = await storage.createMobileLineMovement(req.body);
+      // If the movement updates line data, apply it
+      if (req.body.lineId) {
+        const lineUpdates: any = {};
+        if (req.body.newUser !== undefined) {
+          lineUpdates.responsibleName = req.body.newUser || null;
+          lineUpdates.responsibleDepartment = req.body.newDepartment || null;
+        }
+        if (req.body.newStatus) lineUpdates.status = req.body.newStatus;
+        if (req.body.newChipId) lineUpdates.chipId = req.body.newChipId;
+        if (req.body.newDeviceId) lineUpdates.deviceId = req.body.newDeviceId;
+        if (req.body.ticketNumber) lineUpdates.ticketNumber = req.body.ticketNumber;
+        if (Object.keys(lineUpdates).length > 0) {
+          await storage.updateMobileLine(req.body.lineId, lineUpdates);
+        }
+      }
+      res.status(201).json(movement);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || "Erro ao registrar movimentação" });
+    }
+  });
+
+  // ==================== MOBILE - DASHBOARD STATS ====================
+  app.get("/api/mobile/stats", requireAuth, async (req, res) => {
+    const lines = await storage.getMobileLines();
+    const chips = await storage.getMobileChips();
+    const devices = await storage.getMobileDevices();
+
+    const activeLines = lines.filter(l => l.status === "active").length;
+    const suspendedLines = lines.filter(l => l.status === "suspended").length;
+    const stockLines = lines.filter(l => l.status === "stock").length;
+    const availableChips = chips.filter(c => c.status === "available").length;
+    const availableDevices = devices.filter(d => d.status === "available").length;
+
+    const linesByCarrier: Record<string, number> = {};
+    for (const line of lines) {
+      const name = (line as any).carrier?.name || "Sem operadora";
+      linesByCarrier[name] = (linesByCarrier[name] || 0) + 1;
+    }
+
+    const linesByDepartment: Record<string, number> = {};
+    for (const line of lines.filter(l => l.status === "active")) {
+      const dept = (line as any).responsibleDepartment || "Sem departamento";
+      linesByDepartment[dept] = (linesByDepartment[dept] || 0) + 1;
+    }
+
+    res.json({
+      totalLines: lines.length,
+      activeLines,
+      suspendedLines,
+      stockLines,
+      availableChips,
+      availableDevices,
+      linesByCarrier,
+      linesByDepartment,
+    });
+  });
+
   // Init seed
   await seedDatabase();
 
