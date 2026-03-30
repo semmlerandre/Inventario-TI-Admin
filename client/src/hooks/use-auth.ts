@@ -29,8 +29,8 @@ export function useAuth() {
         credentials: "include",
       });
       if (!res.ok) {
-        if (res.status === 401) throw new Error("Credenciais inválidas");
-        throw new Error("Erro ao fazer login");
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.message || "Credenciais inválidas");
       }
       return api.auth.login.responses[200].parse(await res.json());
     },

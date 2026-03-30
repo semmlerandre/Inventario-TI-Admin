@@ -20,8 +20,17 @@ export async function registerRoutes(
     next();
   };
 
-  app.post(api.auth.login.path, passport.authenticate("local"), (req, res) => {
-    res.status(200).json({ message: "Login successful", user: req.user });
+  app.post(api.auth.login.path, (req, res, next) => {
+    passport.authenticate("local", (err: any, user: any, info: any) => {
+      if (err) return next(err);
+      if (!user) {
+        return res.status(401).json({ message: info?.message || "Usuário ou senha inválidos" });
+      }
+      req.login(user, (loginErr) => {
+        if (loginErr) return next(loginErr);
+        res.status(200).json({ message: "Login successful", user });
+      });
+    })(req, res, next);
   });
 
   app.post(api.auth.logout.path, (req, res, next) => {

@@ -243,30 +243,30 @@ export default function LinhasPage() {
                 </div>
                 <div className="space-y-1.5">
                   <Label>Plano</Label>
-                  <Select value={form.planId} onValueChange={v => setForm(f => ({ ...f, planId: v }))}>
+                  <Select value={form.planId || "none"} onValueChange={v => setForm(f => ({ ...f, planId: v === "none" ? "" : v }))}>
                     <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Sem plano</SelectItem>
+                      <SelectItem value="none">Sem plano</SelectItem>
                       {filteredPlans.map(p => <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-1.5">
                   <Label>Chip</Label>
-                  <Select value={form.chipId} onValueChange={v => setForm(f => ({ ...f, chipId: v }))}>
+                  <Select value={form.chipId || "none"} onValueChange={v => setForm(f => ({ ...f, chipId: v === "none" ? "" : v }))}>
                     <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Sem chip</SelectItem>
+                      <SelectItem value="none">Sem chip</SelectItem>
                       {availableChips.map(c => <SelectItem key={c.id} value={String(c.id)}>{c.iccid} ({c.carrier?.name})</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-1.5">
                   <Label>Aparelho</Label>
-                  <Select value={form.deviceId} onValueChange={v => setForm(f => ({ ...f, deviceId: v }))}>
+                  <Select value={form.deviceId || "none"} onValueChange={v => setForm(f => ({ ...f, deviceId: v === "none" ? "" : v }))}>
                     <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Sem aparelho</SelectItem>
+                      <SelectItem value="none">Sem aparelho</SelectItem>
                       {availableDevices.map(d => <SelectItem key={d.id} value={String(d.id)}>{d.brand} {d.model}</SelectItem>)}
                     </SelectContent>
                   </Select>

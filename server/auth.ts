@@ -52,7 +52,10 @@ export function setupAuth(app: Express) {
       try {
         const user = await storage.getUserByUsername(username);
         if (!user || !(await comparePasswords(password, user.password))) {
-          return done(null, false);
+          return done(null, false, { message: "Usuário ou senha inválidos" });
+        }
+        if (!user.isActive) {
+          return done(null, false, { message: "Usuário bloqueado. Entre em contato com o administrador." });
         }
         return done(null, user);
       } catch (err) {
@@ -65,6 +68,10 @@ export function setupAuth(app: Express) {
   passport.deserializeUser(async (id: number, done) => {
     try {
       const user = await storage.getUser(id);
+      // If user was blocked after login, invalidate their session
+      if (!user || !user.isActive) {
+        return done(null, false);
+      }
       done(null, user);
     } catch (err) {
       done(err);
