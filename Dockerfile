@@ -20,11 +20,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 COPY package*.json ./
-RUN npm install
+RUN npm install --omit=dev
 
 COPY --from=builder /app/dist ./dist
-COPY shared ./shared
-COPY drizzle.config.ts ./drizzle.config.ts
 
 RUN mkdir -p /app/uploads
 

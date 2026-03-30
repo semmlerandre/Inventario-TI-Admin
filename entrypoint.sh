@@ -17,11 +17,9 @@ until nc -z "$DB_HOST" "$DB_PORT"; do
 done
 echo "Banco de dados disponivel!"
 
-echo "Executando migrações do banco de dados..."
-npx drizzle-kit push --force 2>&1 || {
-  echo "AVISO: drizzle-kit push falhou, tentando continuar..."
-}
-echo "Migrações concluídas!"
+echo "Criando tabelas do banco de dados..."
+node dist/migrate.cjs
+echo "Tabelas prontas!"
 
 echo "Iniciando aplicação na porta $PORT..."
 exec node dist/index.cjs
