@@ -4,12 +4,14 @@ services:
     container_name: inventario-ti
     restart: always
     ports:
-      - "5000:5000"
+      - "${APP_PORT:-5000}:5000"
     environment:
-      - DATABASE_URL=postgres://user:pass@db:5432/inventory
-      - SESSION_SECRET=sua_chave_super_secreta
+      - DATABASE_URL=postgres://${DB_USER:-inventario}:${DB_PASSWORD:-inventario123}@db:5432/${DB_NAME:-inventario}
+      - SESSION_SECRET=${SESSION_SECRET:-mude_esta_chave_secreta_em_producao}
       - NODE_ENV=production
       - PORT=5000
+    volumes:
+      - uploads_data:/app/uploads
     depends_on:
       db:
         condition: service_healthy
@@ -19,16 +21,19 @@ services:
     container_name: inventario-ti-db
     restart: always
     environment:
-      - POSTGRES_USER=user
-      - POSTGRES_PASSWORD=pass
-      - POSTGRES_DB=inventory
+      - POSTGRES_USER=${DB_USER:-inventario}
+      - POSTGRES_PASSWORD=${DB_PASSWORD:-inventario123}
+      - POSTGRES_DB=${DB_NAME:-inventario}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U user -d inventory"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-inventario} -d ${DB_NAME:-inventario}"]
       interval: 10s
       timeout: 5s
       retries: 5
+    ports:
+      - "${DB_PORT:-5432}:5432"
 
 volumes:
   postgres_data:
+  uploads_data:
