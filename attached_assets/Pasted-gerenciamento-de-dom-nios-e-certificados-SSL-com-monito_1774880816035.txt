@@ -1,0 +1,170 @@
+gerenciamento de domínios e certificados SSL com monitoramento automático e envio de alertas por e-mail.
+
+🎯 Objetivo
+
+Permitir controle centralizado de domínios e certificados SSL, com notificações automáticas antes do vencimento para evitar indisponibilidade de serviços.
+
+🏗️ Tecnologias obrigatórias
+Backend: Node.js + Express
+Banco de dados: PostgreSQL
+ORM: Prisma ou Drizzle
+Frontend: React + TailwindCSS
+Scheduler: node-cron
+Email: SMTP (Nodemailer)
+🧩 Funcionalidades
+1. Gestão de Domínios
+
+Permitir:
+
+Cadastrar domínio com:
+Nome do domínio (ex: empresa.com.br)
+Responsável
+Email
+Provedor (Cloudflare, Registro.br, GoDaddy, etc.)
+Ambiente (produção / homologação)
+📅 Data de renovação (campo manual obrigatório)
+Editar domínio
+Excluir domínio
+Listar domínios
+2. Monitoramento de Certificados SSL
+
+Para cada domínio:
+
+Buscar automaticamente:
+Data de expiração do SSL
+Emissor do certificado
+Dias restantes
+3. Sistema de Alertas (CRÍTICO)
+
+Enviar e-mails automaticamente quando faltar:
+
+Para DOMÍNIO (baseado na data de renovação):
+90 dias
+60 dias
+30 dias
+Para SSL (baseado na expiração):
+90 dias
+60 dias
+30 dias
+4. Regras de Notificação
+Não enviar alerta duplicado
+Cada alerta deve ser registrado
+Deve existir controle por:
+domínio
+tipo (domain ou ssl)
+intervalo (90, 60, 30)
+5. Dashboard
+
+Mostrar:
+
+Total de domínios
+Domínios próximos da renovação
+SSL próximos do vencimento
+Domínios expirados
+SSL expirados
+6. Status visual
+
+Aplicar cores:
+
+Verde: mais de 90 dias
+Amarelo: entre 60 e 90 dias
+Laranja: entre 30 e 60 dias
+Vermelho: menos de 30 dias ou expirado
+7. Histórico de notificações
+
+Registrar:
+
+Domínio
+Tipo (domain ou ssl)
+Tipo de alerta (90, 60, 30)
+Data de envio
+Status (enviado ou erro)
+8. Filtros
+Buscar por domínio
+Filtrar por status
+Filtrar por responsável
+🗄️ Estrutura do Banco
+Tabela: domains
+id
+domain_name
+responsible
+email
+provider
+environment
+renewal_date
+created_at
+Tabela: certificates
+id
+domain_id
+issuer
+expiration_date
+last_checked
+Tabela: notifications
+id
+domain_id
+type (domain ou ssl)
+alert_type (90, 60, 30)
+sent_at
+status
+🔄 Scheduler (Automação)
+
+Executar diariamente:
+
+Buscar todos os domínios
+Verificar SSL automaticamente
+Calcular dias restantes (domínio e SSL)
+Validar regras de alerta
+Enviar e-mail
+Registrar histórico
+📧 Email
+
+Enviar com:
+
+Assunto:
+
+⚠️ Domínio próximo da renovação - {dominio}
+🔐 SSL próximo do vencimento - {dominio}
+
+Conteúdo:
+
+Nome do domínio
+Tipo (Domínio ou SSL)
+Dias restantes
+Data de expiração
+Link do sistema
+🔐 Autenticação
+Login simples
+Usuário admin
+Sessão ou JWT
+🖥️ Frontend
+
+Criar páginas:
+
+Dashboard
+Lista de domínios
+Cadastro / edição
+Detalhes do domínio
+Histórico de notificações
+🐳 Deploy
+Docker + Docker Compose
+PostgreSQL como banco
+Backend e frontend separados
+⚠️ Requisitos importantes
+Sistema deve ser resiliente a falhas
+Retry no envio de e-mail
+Logs claros
+Não enviar notificações duplicadas
+Código organizado em camadas (controller, service, repository)
+🚀 Diferenciais (opcional)
+Integração com Cloudflare API
+Integração com Let's Encrypt
+Notificação via Slack / Teams
+Multi-empresa (multi-tenant)
+🎯 Resultado esperado
+
+Um sistema web completo que:
+
+Monitora domínios e SSL automaticamente
+Envia alertas antes do vencimento
+Evita perda de domínio ou certificado
+Centraliza toda gestão em um único painel
