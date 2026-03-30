@@ -118,6 +118,8 @@ if (-not $gitInstalled) {
 # ============================================================
 # PASSO 4: Clonar ou atualizar repositório
 # ============================================================
+$isFreshInstall = $false
+
 if (Test-Path (Join-Path $AppDir ".git")) {
     Write-Info "Projeto ja existe em $AppDir. Atualizando..."
     Set-Location $AppDir
@@ -126,6 +128,7 @@ if (Test-Path (Join-Path $AppDir ".git")) {
         git pull origin master 2>&1
     }
     Write-Success "Codigo atualizado!"
+    $isFreshInstall = $false
 } else {
     Write-Info "Clonando repositorio para $AppDir..."
     $parentDir = Split-Path $AppDir -Parent
@@ -135,6 +138,7 @@ if (Test-Path (Join-Path $AppDir ".git")) {
     git clone $RepoUrl $AppDir
     Set-Location $AppDir
     Write-Success "Repositorio clonado!"
+    $isFreshInstall = $true
 }
 
 Set-Location $AppDir
@@ -165,11 +169,15 @@ if (-not (Test-Path ".env")) {
 # ============================================================
 # PASSO 6: Build e inicialização dos containers
 # ============================================================
-Write-Info "Verificando containers em execucao..."
-$runningServices = Invoke-Expression "$composeCmd ps --services 2>&1"
-if ($runningServices) {
-    Write-Info "Parando containers antigos..."
-    Invoke-Expression "$composeCmd down" | Out-Null
+Write-Info "Parando containers existentes..."
+if ($isFreshInstall) {
+    # Instalação nova: remove volumes antigos para evitar conflito de credenciais
+    Invoke-Expression "$composeCmd down --volumes --remove-orphans 2>&1" | Out-Null
+    Write-Info "Volumes antigos removidos para evitar conflito de credenciais."
+} else {
+    # Atualização: preserva volumes (mantém dados do banco)
+    Invoke-Expression "$composeCmd down --remove-orphans 2>&1" | Out-Null
+    Write-Info "Dados do banco preservados."
 }
 
 Write-Info "Construindo imagem Docker (pode demorar alguns minutos na primeira vez)..."
