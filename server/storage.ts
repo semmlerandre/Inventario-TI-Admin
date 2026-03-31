@@ -2,6 +2,7 @@ import { db } from "./db";
 import {
   users, settings, items, transactions,
   mobileCarriers, mobilePlans, mobileChips, mobileDevices, mobileLines, mobileLineMovements,
+  domains, certificates, domainNotifications,
   type User, type InsertUser,
   type Settings, type InsertSettings, type UpdateSettingsRequest,
   type Item, type InsertItem, type UpdateItemRequest,
@@ -12,8 +13,11 @@ import {
   type MobileDevice, type InsertMobileDevice,
   type MobileLine, type InsertMobileLine,
   type MobileLineMovement, type InsertMobileLineMovement,
+  type Domain, type InsertDomain,
+  type Certificate, type InsertCertificate,
+  type DomainNotification, type InsertDomainNotification,
 } from "@shared/schema";
-import { eq, desc, not } from "drizzle-orm";
+import { eq, desc, not, and } from "drizzle-orm";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
 import { pool } from "./db";
@@ -168,6 +172,21 @@ export interface IStorage {
   // Mobile - Movements
   getMobileLineMovements(lineId?: number): Promise<(MobileLineMovement & { line: MobileLine })[]>;
   createMobileLineMovement(data: InsertMobileLineMovement): Promise<MobileLineMovement>;
+
+  // Domains
+  getDomains(): Promise<(Domain & { certificate: Certificate | null })[]>;
+  getDomain(id: number): Promise<(Domain & { certificate: Certificate | null }) | undefined>;
+  createDomain(data: InsertDomain): Promise<Domain>;
+  updateDomain(id: number, data: Partial<InsertDomain>): Promise<Domain>;
+  deleteDomain(id: number): Promise<void>;
+
+  // Certificates
+  upsertCertificate(data: Omit<InsertCertificate, 'id'>): Promise<Certificate>;
+
+  // Domain Notifications
+  getDomainNotifications(domainId?: number): Promise<(DomainNotification & { domain: Domain })[]>;
+  createDomainNotification(data: Omit<InsertDomainNotification, 'status'> & { status?: string; errorMessage?: string }): Promise<DomainNotification>;
+  notificationExists(domainId: number, type: string, alertType: number): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -523,6 +542,92 @@ export class DatabaseStorage implements IStorage {
   async createMobileLineMovement(data: InsertMobileLineMovement): Promise<MobileLineMovement> {
     const [movement] = await db.insert(mobileLineMovements).values(data).returning();
     return movement;
+  }
+
+  // ==================== DOMAINS ====================
+
+  async getDomains(): Promise<(Domain & { certificate: Certificate | null })[]> {
+    const rows = await db.select({ domain: domains, certificate: certificates })
+      .from(domains)
+      .leftJoin(certificates, eq(domains.id, certificates.domainId))
+      .orderBy(desc(domains.createdAt));
+    return rows.map(r => ({ ...r.domain, certificate: r.certificate ?? null }));
+  }
+
+  async getDomain(id: number): Promise<(Domain & { certificate: Certificate | null }) | undefined> {
+    const [row] = await db.select({ domain: domains, certificate: certificates })
+      .from(domains)
+      .leftJoin(certificates, eq(domains.id, certificates.domainId))
+      .where(eq(domains.id, id));
+    if (!row) return undefined;
+    return { ...row.domain, certificate: row.certificate ?? null };
+  }
+
+  async createDomain(data: InsertDomain): Promise<Domain> {
+    const [domain] = await db.insert(domains).values(data).returning();
+    return domain;
+  }
+
+  async updateDomain(id: number, data: Partial<InsertDomain>): Promise<Domain> {
+    const [domain] = await db.update(domains).set(data).where(eq(domains.id, id)).returning();
+    return domain;
+  }
+
+  async deleteDomain(id: number): Promise<void> {
+    await db.delete(domainNotifications).where(eq(domainNotifications.domainId, id));
+    await db.delete(certificates).where(eq(certificates.domainId, id));
+    await db.delete(domains).where(eq(domains.id, id));
+  }
+
+  // ==================== CERTIFICATES ====================
+
+  async upsertCertificate(data: Omit<InsertCertificate, 'id'>): Promise<Certificate> {
+    const existing = await db.select().from(certificates).where(eq(certificates.domainId, data.domainId));
+    if (existing.length > 0) {
+      const [cert] = await db.update(certificates)
+        .set({ ...data, lastChecked: new Date() })
+        .where(eq(certificates.domainId, data.domainId))
+        .returning();
+      return cert;
+    }
+    const [cert] = await db.insert(certificates).values({ ...data, lastChecked: new Date() }).returning();
+    return cert;
+  }
+
+  // ==================== DOMAIN NOTIFICATIONS ====================
+
+  async getDomainNotifications(domainId?: number): Promise<(DomainNotification & { domain: Domain })[]> {
+    let query = db.select({ notification: domainNotifications, domain: domains })
+      .from(domainNotifications)
+      .leftJoin(domains, eq(domainNotifications.domainId, domains.id))
+      .$dynamic();
+    if (domainId) {
+      query = query.where(eq(domainNotifications.domainId, domainId));
+    }
+    const rows = await query.orderBy(desc(domainNotifications.sentAt));
+    return rows.map(r => ({ ...r.notification, domain: r.domain! }));
+  }
+
+  async createDomainNotification(data: any): Promise<DomainNotification> {
+    const [notification] = await db.insert(domainNotifications).values({
+      domainId: data.domainId,
+      type: data.type,
+      alertType: data.alertType,
+      status: data.status || "sent",
+      errorMessage: data.errorMessage || null,
+    }).returning();
+    return notification;
+  }
+
+  async notificationExists(domainId: number, type: string, alertType: number): Promise<boolean> {
+    const rows = await db.select().from(domainNotifications).where(
+      and(
+        eq(domainNotifications.domainId, domainId),
+        eq(domainNotifications.type, type),
+        eq(domainNotifications.alertType, alertType)
+      )
+    );
+    return rows.length > 0;
   }
 }
 

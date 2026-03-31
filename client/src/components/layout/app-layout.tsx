@@ -2,7 +2,8 @@ import { ReactNode, useState } from "react";
 import { Link, useLocation } from "wouter";
 import {
   LayoutDashboard, Package, ArrowLeftRight, Settings, LogOut, Loader2, Server,
-  Smartphone, ChevronDown, ChevronRight, Building2, CreditCard, Cpu, Phone, BarChart3
+  Smartphone, ChevronDown, ChevronRight, Building2, CreditCard, Cpu, Phone, BarChart3,
+  Globe, Shield, Bell
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { useSettings } from "@/hooks/use-settings";
@@ -19,6 +20,12 @@ const TELEFONIA_ROUTES = [
   "/telefonia/relatorios",
 ];
 
+const DOMINIOS_ROUTES = [
+  "/dominios",
+  "/dominios/novo",
+  "/dominios/notificacoes",
+];
+
 export function AppLayout({ children }: { children: ReactNode }) {
   const [location] = useLocation();
   const { user, logout } = useAuth();
@@ -27,6 +34,9 @@ export function AppLayout({ children }: { children: ReactNode }) {
   // Open telefonia submenu if we're on a telefonia route
   const [telefoniaOpen, setTelefoniaOpen] = useState(() =>
     TELEFONIA_ROUTES.some(r => location === r || location.startsWith("/telefonia"))
+  );
+  const [dominiosOpen, setDominiosOpen] = useState(() =>
+    location.startsWith("/dominios")
   );
 
   const navItems = [
@@ -48,6 +58,12 @@ export function AppLayout({ children }: { children: ReactNode }) {
   ];
 
   const isTelefoniaActive = TELEFONIA_ROUTES.some(r => location === r);
+  const isDominiosActive = location.startsWith("/dominios");
+
+  const dominiosSubItems = [
+    { href: "/dominios", label: "Visão Geral", icon: Globe },
+    { href: "/dominios/notificacoes", label: "Alertas", icon: Bell },
+  ];
 
   if (!user) return null;
 
@@ -119,6 +135,53 @@ export function AppLayout({ children }: { children: ReactNode }) {
             {telefoniaOpen && (
               <div className="mt-1 ml-4 pl-3 border-l-2 border-slate-100 space-y-0.5">
                 {telefoniaSubItems.map(item => {
+                  const isActive = location === item.href;
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      className={`
+                        flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all duration-150 text-sm font-medium
+                        ${isActive
+                          ? "bg-primary text-primary-foreground shadow-sm shadow-primary/20"
+                          : "text-slate-500 hover:bg-slate-100 hover:text-slate-800"
+                        }
+                      `}
+                      data-testid={`nav-${item.href.replace(/\//g, "-").slice(1)}`}
+                    >
+                      <item.icon className="h-4 w-4" />
+                      {item.label}
+                    </Link>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Domínios & SSL Section */}
+          <div>
+            <button
+              onClick={() => setDominiosOpen(o => !o)}
+              className={`
+                w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 font-medium
+                ${isDominiosActive
+                  ? "bg-primary/10 text-primary"
+                  : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                }
+              `}
+              data-testid="nav-dominios-toggle"
+            >
+              <Globe className="h-5 w-5 flex-shrink-0" />
+              <span className="flex-1 text-left">Domínios & SSL</span>
+              {dominiosOpen
+                ? <ChevronDown className="h-4 w-4 flex-shrink-0" />
+                : <ChevronRight className="h-4 w-4 flex-shrink-0" />
+              }
+            </button>
+
+            {dominiosOpen && (
+              <div className="mt-1 ml-4 pl-3 border-l-2 border-slate-100 space-y-0.5">
+                {dominiosSubItems.map(item => {
                   const isActive = location === item.href;
                   return (
                     <Link

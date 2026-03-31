@@ -178,6 +178,51 @@ export const mobileLineMovementsRelations = relations(mobileLineMovements, ({ on
   line: one(mobileLines, { fields: [mobileLineMovements.lineId], references: [mobileLines.id] }),
 }));
 
+// ==================== DOMÍNIOS & SSL ====================
+
+export const domains = pgTable("domains", {
+  id: serial("id").primaryKey(),
+  domainName: text("domain_name").notNull(),
+  responsible: text("responsible"),
+  email: text("email"),
+  provider: text("provider"),
+  environment: text("environment").notNull().default("production"),
+  renewalDate: timestamp("renewal_date"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const certificates = pgTable("certificates", {
+  id: serial("id").primaryKey(),
+  domainId: integer("domain_id").notNull().unique(),
+  issuer: text("issuer"),
+  expirationDate: timestamp("expiration_date"),
+  lastChecked: timestamp("last_checked").defaultNow(),
+});
+
+export const domainNotifications = pgTable("domain_notifications", {
+  id: serial("id").primaryKey(),
+  domainId: integer("domain_id").notNull(),
+  type: text("type").notNull(), // 'domain' or 'ssl'
+  alertType: integer("alert_type").notNull(), // 90, 60, 30
+  sentAt: timestamp("sent_at").defaultNow(),
+  status: text("status").notNull().default("sent"), // 'sent', 'error'
+  errorMessage: text("error_message"),
+});
+
+export const domainsRelations = relations(domains, ({ one, many }) => ({
+  certificate: one(certificates, { fields: [domains.id], references: [certificates.domainId] }),
+  notifications: many(domainNotifications),
+}));
+
+export const certificatesRelations = relations(certificates, ({ one }) => ({
+  domain: one(domains, { fields: [certificates.domainId], references: [domains.id] }),
+}));
+
+export const domainNotificationsRelations = relations(domainNotifications, ({ one }) => ({
+  domain: one(domains, { fields: [domainNotifications.domainId], references: [domains.id] }),
+}));
+
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({ id: true });
 export const insertSettingsSchema = createInsertSchema(settings).omit({ id: true });
@@ -190,6 +235,10 @@ export const insertMobileChipSchema = createInsertSchema(mobileChips).omit({ id:
 export const insertMobileDeviceSchema = createInsertSchema(mobileDevices).omit({ id: true, createdAt: true });
 export const insertMobileLineSchema = createInsertSchema(mobileLines).omit({ id: true, createdAt: true });
 export const insertMobileLineMovementSchema = createInsertSchema(mobileLineMovements).omit({ id: true, createdAt: true });
+
+export const insertDomainSchema = createInsertSchema(domains).omit({ id: true, createdAt: true });
+export const insertCertificateSchema = createInsertSchema(certificates).omit({ id: true, lastChecked: true });
+export const insertDomainNotificationSchema = createInsertSchema(domainNotifications).omit({ id: true, sentAt: true });
 
 // Types
 export type User = typeof users.$inferSelect;
@@ -219,3 +268,11 @@ export type InsertMobileLineMovement = z.infer<typeof insertMobileLineMovementSc
 export type UpdateSettingsRequest = Partial<InsertSettings>;
 export type UpdateItemRequest = Partial<InsertItem>;
 export type ChangePasswordRequest = { currentPassword: string; newPassword: string };
+
+export type Domain = typeof domains.$inferSelect;
+export type Certificate = typeof certificates.$inferSelect;
+export type DomainNotification = typeof domainNotifications.$inferSelect;
+
+export type InsertDomain = z.infer<typeof insertDomainSchema>;
+export type InsertCertificate = z.infer<typeof insertCertificateSchema>;
+export type InsertDomainNotification = z.infer<typeof insertDomainNotificationSchema>;

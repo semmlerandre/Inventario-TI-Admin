@@ -24,6 +24,11 @@ import LinhasPage from "./pages/telefonia/linhas";
 import MovimentacoesPage from "./pages/telefonia/movimentacoes";
 import RelatoriosPage from "./pages/telefonia/relatorios";
 
+// Domínios & SSL
+import DominiosPage from "./pages/dominios/index";
+import DominioFormPage from "./pages/dominios/form";
+import DominioNotificacoesPage from "./pages/dominios/notificacoes";
+
 function ProtectedRoute({ component: Component, ...rest }: any) {
   const { user, isLoading } = useAuth();
   
@@ -80,6 +85,19 @@ function Router() {
       </Route>
       <Route path="/telefonia/relatorios">
         <ProtectedRoute component={RelatoriosPage} />
+      </Route>
+      {/* Domínios & SSL */}
+      <Route path="/dominios">
+        <ProtectedRoute component={DominiosPage} />
+      </Route>
+      <Route path="/dominios/novo">
+        <ProtectedRoute component={DominioFormPage} />
+      </Route>
+      <Route path="/dominios/notificacoes">
+        <ProtectedRoute component={DominioNotificacoesPage} />
+      </Route>
+      <Route path="/dominios/:id/editar">
+        <ProtectedRoute component={DominioFormPage} />
       </Route>
       <Route component={NotFound} />
     </Switch>

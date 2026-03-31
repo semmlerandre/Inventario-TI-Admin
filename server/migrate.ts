@@ -139,6 +139,36 @@ async function migrate() {
         notes TEXT,
         created_at TIMESTAMP DEFAULT NOW()
       );
+
+      CREATE TABLE IF NOT EXISTS domains (
+        id SERIAL PRIMARY KEY,
+        domain_name TEXT NOT NULL,
+        responsible TEXT,
+        email TEXT,
+        provider TEXT,
+        environment TEXT NOT NULL DEFAULT 'production',
+        renewal_date TIMESTAMP,
+        notes TEXT,
+        created_at TIMESTAMP DEFAULT NOW()
+      );
+
+      CREATE TABLE IF NOT EXISTS certificates (
+        id SERIAL PRIMARY KEY,
+        domain_id INTEGER NOT NULL UNIQUE,
+        issuer TEXT,
+        expiration_date TIMESTAMP,
+        last_checked TIMESTAMP DEFAULT NOW()
+      );
+
+      CREATE TABLE IF NOT EXISTS domain_notifications (
+        id SERIAL PRIMARY KEY,
+        domain_id INTEGER NOT NULL,
+        type TEXT NOT NULL,
+        alert_type INTEGER NOT NULL,
+        sent_at TIMESTAMP DEFAULT NOW(),
+        status TEXT NOT NULL DEFAULT 'sent',
+        error_message TEXT
+      );
     `);
 
     console.log("Tabelas criadas com sucesso!");

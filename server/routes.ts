@@ -479,6 +479,68 @@ export async function registerRoutes(
     });
   });
 
+  // ==================== DOMÍNIOS & SSL ====================
+
+  app.get("/api/domains", requireAuth, async (_req, res) => {
+    const data = await storage.getDomains();
+    res.json(data);
+  });
+
+  app.get("/api/domains/:id", requireAuth, async (req, res) => {
+    const domain = await storage.getDomain(Number(req.params.id));
+    if (!domain) return res.status(404).json({ message: "Domínio não encontrado" });
+    res.json(domain);
+  });
+
+  app.post("/api/domains", requireAuth, async (req, res) => {
+    const { insertDomainSchema } = await import("@shared/schema");
+    const parsed = insertDomainSchema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ message: "Dados inválidos", errors: parsed.error.errors });
+    const domain = await storage.createDomain(parsed.data);
+    res.status(201).json(domain);
+  });
+
+  app.put("/api/domains/:id", requireAuth, async (req, res) => {
+    const { insertDomainSchema } = await import("@shared/schema");
+    const parsed = insertDomainSchema.partial().safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ message: "Dados inválidos", errors: parsed.error.errors });
+    const domain = await storage.updateDomain(Number(req.params.id), parsed.data);
+    res.json(domain);
+  });
+
+  app.delete("/api/domains/:id", requireAuth, async (req, res) => {
+    await storage.deleteDomain(Number(req.params.id));
+    res.status(204).send();
+  });
+
+  app.post("/api/domains/:id/check-ssl", requireAuth, async (req, res) => {
+    const domain = await storage.getDomain(Number(req.params.id));
+    if (!domain) return res.status(404).json({ message: "Domínio não encontrado" });
+    const { checkSSL } = await import("./ssl-checker");
+    const sslInfo = await checkSSL(domain.domainName);
+    if (!sslInfo.error) {
+      await storage.upsertCertificate({ domainId: domain.id, issuer: sslInfo.issuer, expirationDate: sslInfo.expirationDate });
+    }
+    const updated = await storage.getDomain(domain.id);
+    res.json({ ...updated, sslInfo });
+  });
+
+  app.post("/api/domains/check-all", requireAuth, async (_req, res) => {
+    const { runDomainChecks } = await import("./scheduler");
+    runDomainChecks().catch(console.error);
+    res.json({ message: "Verificação iniciada em segundo plano" });
+  });
+
+  app.get("/api/domains/:id/notifications", requireAuth, async (req, res) => {
+    const data = await storage.getDomainNotifications(Number(req.params.id));
+    res.json(data);
+  });
+
+  app.get("/api/domain-notifications", requireAuth, async (_req, res) => {
+    const data = await storage.getDomainNotifications();
+    res.json(data);
+  });
+
   // Init seed
   await seedDatabase();
 
