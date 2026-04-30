@@ -236,8 +236,15 @@ export const insertMobileDeviceSchema = createInsertSchema(mobileDevices).omit({
 export const insertMobileLineSchema = createInsertSchema(mobileLines).omit({ id: true, createdAt: true });
 export const insertMobileLineMovementSchema = createInsertSchema(mobileLineMovements).omit({ id: true, createdAt: true });
 
-export const insertDomainSchema = createInsertSchema(domains).omit({ id: true, createdAt: true });
-export const insertCertificateSchema = createInsertSchema(certificates).omit({ id: true, lastChecked: true });
+export const insertDomainSchema = createInsertSchema(domains)
+  .omit({ id: true, createdAt: true })
+  .extend({ renewalDate: z.coerce.date().optional().nullable() });
+export const insertCertificateSchema = createInsertSchema(certificates)
+  .omit({ id: true, lastChecked: true })
+  .extend({
+    expirationDate: z.coerce.date().optional().nullable(),
+    issueDate: z.coerce.date().optional().nullable(),
+  });
 export const insertDomainNotificationSchema = createInsertSchema(domainNotifications).omit({ id: true, sentAt: true });
 
 // Types
