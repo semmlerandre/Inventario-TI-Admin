@@ -28,6 +28,7 @@ import RelatoriosPage from "./pages/telefonia/relatorios";
 import DominiosPage from "./pages/dominios/index";
 import DominioFormPage from "./pages/dominios/form";
 import DominioNotificacoesPage from "./pages/dominios/notificacoes";
+import DominiosRelatoriosPage from "./pages/dominios/relatorios";
 
 function ProtectedRoute({ component: Component, ...rest }: any) {
   const { user, isLoading } = useAuth();
@@ -95,6 +96,9 @@ function Router() {
       </Route>
       <Route path="/dominios/notificacoes">
         <ProtectedRoute component={DominioNotificacoesPage} />
+      </Route>
+      <Route path="/dominios/relatorios">
+        <ProtectedRoute component={DominiosRelatoriosPage} />
       </Route>
       <Route path="/dominios/:id/editar">
         <ProtectedRoute component={DominioFormPage} />

@@ -24,6 +24,7 @@ const DOMINIOS_ROUTES = [
   "/dominios",
   "/dominios/novo",
   "/dominios/notificacoes",
+  "/dominios/relatorios",
 ];
 
 export function AppLayout({ children }: { children: ReactNode }) {
@@ -63,6 +64,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
   const dominiosSubItems = [
     { href: "/dominios", label: "Visão Geral", icon: Globe },
     { href: "/dominios/notificacoes", label: "Alertas", icon: Bell },
+    { href: "/dominios/relatorios", label: "Relatórios", icon: BarChart3 },
   ];
 
   if (!user) return null;
