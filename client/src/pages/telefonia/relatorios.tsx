@@ -32,9 +32,9 @@ const DEVICE_STATUS_LABELS: Record<string, string> = { available: "Disponível",
 export default function RelatoriosPage() {
   const [tab, setTab] = useState("linhas");
   const [search, setSearch] = useState("");
-  const [filterCarrier, setFilterCarrier] = useState("");
-  const [filterDept, setFilterDept] = useState("");
-  const [filterStatus, setFilterStatus] = useState("");
+  const [filterCarrier, setFilterCarrier] = useState("all");
+  const [filterDept, setFilterDept] = useState("all");
+  const [filterStatus, setFilterStatus] = useState("all");
 
   const { data: lines = [] } = useQuery<any[]>({ queryKey: ["/api/mobile/lines"] });
   const { data: chips = [] } = useQuery<any[]>({ queryKey: ["/api/mobile/chips"] });
@@ -48,9 +48,9 @@ export default function RelatoriosPage() {
   // Filter lines
   const filteredLines = lines.filter(l => {
     const matchSearch = !search || l.number.includes(search) || (l.responsibleName || "").toLowerCase().includes(search.toLowerCase());
-    const matchCarrier = !filterCarrier || String(l.carrierId) === filterCarrier;
-    const matchDept = !filterDept || l.responsibleDepartment === filterDept;
-    const matchStatus = !filterStatus || l.status === filterStatus;
+    const matchCarrier = filterCarrier === "all" || String(l.carrierId) === filterCarrier;
+    const matchDept = filterDept === "all" || l.responsibleDepartment === filterDept;
+    const matchStatus = filterStatus === "all" || l.status === filterStatus;
     return matchSearch && matchCarrier && matchDept && matchStatus;
   });
 
@@ -139,21 +139,21 @@ export default function RelatoriosPage() {
                 <Select value={filterCarrier} onValueChange={setFilterCarrier}>
                   <SelectTrigger className="w-44"><SelectValue placeholder="Operadora" /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Todas</SelectItem>
+                    <SelectItem value="all">Todas</SelectItem>
                     {carriers.map(c => <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
                 <Select value={filterDept} onValueChange={setFilterDept}>
                   <SelectTrigger className="w-44"><SelectValue placeholder="Departamento" /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Todos</SelectItem>
+                    <SelectItem value="all">Todos</SelectItem>
                     {departments.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
                   </SelectContent>
                 </Select>
                 <Select value={filterStatus} onValueChange={setFilterStatus}>
                   <SelectTrigger className="w-44"><SelectValue placeholder="Status" /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Todos</SelectItem>
+                    <SelectItem value="all">Todos</SelectItem>
                     {Object.entries(LINE_STATUS_LABELS).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}
                   </SelectContent>
                 </Select>
