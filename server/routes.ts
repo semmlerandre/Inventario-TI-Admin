@@ -7,6 +7,35 @@ import { setupAuth, hashPassword, comparePasswords } from "./auth";
 import passport from "passport";
 import nodemailer from "nodemailer";
 
+function toDateOrNull(value: unknown): Date | null {
+  if (!value || value === "") return null;
+  if (value instanceof Date) return value;
+  const d = new Date(value as string);
+  return isNaN(d.getTime()) ? null : d;
+}
+
+function parseMobileLineDates(body: any) {
+  return {
+    ...body,
+    deliveryDate: toDateOrNull(body.deliveryDate),
+    requestDate: toDateOrNull(body.requestDate),
+  };
+}
+
+function parseMobileChipDates(body: any) {
+  return {
+    ...body,
+    activationDate: toDateOrNull(body.activationDate),
+  };
+}
+
+function parseMobileDeviceDates(body: any) {
+  return {
+    ...body,
+    acquisitionDate: toDateOrNull(body.acquisitionDate),
+  };
+}
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
@@ -327,7 +356,7 @@ export async function registerRoutes(
 
   app.post("/api/mobile/chips", requireAuth, async (req, res) => {
     try {
-      const chip = await storage.createMobileChip(req.body);
+      const chip = await storage.createMobileChip(parseMobileChipDates(req.body));
       res.status(201).json(chip);
     } catch (err: any) {
       res.status(500).json({ message: err.message || "Erro ao criar chip" });
@@ -336,7 +365,7 @@ export async function registerRoutes(
 
   app.patch("/api/mobile/chips/:id", requireAuth, async (req, res) => {
     try {
-      const chip = await storage.updateMobileChip(Number(req.params.id), req.body);
+      const chip = await storage.updateMobileChip(Number(req.params.id), parseMobileChipDates(req.body));
       res.json(chip);
     } catch (err: any) {
       res.status(500).json({ message: err.message || "Erro ao atualizar chip" });
@@ -356,7 +385,7 @@ export async function registerRoutes(
 
   app.post("/api/mobile/devices", requireAuth, async (req, res) => {
     try {
-      const device = await storage.createMobileDevice(req.body);
+      const device = await storage.createMobileDevice(parseMobileDeviceDates(req.body));
       res.status(201).json(device);
     } catch (err: any) {
       res.status(500).json({ message: err.message || "Erro ao criar aparelho" });
@@ -365,7 +394,7 @@ export async function registerRoutes(
 
   app.patch("/api/mobile/devices/:id", requireAuth, async (req, res) => {
     try {
-      const device = await storage.updateMobileDevice(Number(req.params.id), req.body);
+      const device = await storage.updateMobileDevice(Number(req.params.id), parseMobileDeviceDates(req.body));
       res.json(device);
     } catch (err: any) {
       res.status(500).json({ message: err.message || "Erro ao atualizar aparelho" });
@@ -391,7 +420,8 @@ export async function registerRoutes(
 
   app.post("/api/mobile/lines", requireAuth, async (req, res) => {
     try {
-      const line = await storage.createMobileLine(req.body);
+      const body = parseMobileLineDates(req.body);
+      const line = await storage.createMobileLine(body);
       res.status(201).json(line);
     } catch (err: any) {
       res.status(500).json({ message: err.message || "Erro ao criar linha" });
@@ -400,7 +430,8 @@ export async function registerRoutes(
 
   app.patch("/api/mobile/lines/:id", requireAuth, async (req, res) => {
     try {
-      const line = await storage.updateMobileLine(Number(req.params.id), req.body);
+      const body = parseMobileLineDates(req.body);
+      const line = await storage.updateMobileLine(Number(req.params.id), body);
       res.json(line);
     } catch (err: any) {
       res.status(500).json({ message: err.message || "Erro ao atualizar linha" });
