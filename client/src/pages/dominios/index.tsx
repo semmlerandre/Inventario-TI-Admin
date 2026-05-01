@@ -99,7 +99,13 @@ export default function DominiosPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-slate-900">Domínios & SSL</h1>
-            <p className="text-slate-500 text-sm mt-0.5">Monitoramento de domínios e certificados SSL</p>
+            <div className="flex items-center gap-2 mt-0.5">
+              <p className="text-slate-500 text-sm">Monitoramento de domínios e certificados SSL</p>
+              <span className="inline-flex items-center gap-1 text-xs bg-green-50 text-green-700 border border-green-200 rounded-full px-2 py-0.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+                Verificação automática ativa · 08h e 20h
+              </span>
+            </div>
           </div>
           <div className="flex gap-2">
             <Button
@@ -107,9 +113,10 @@ export default function DominiosPage() {
               onClick={() => checkAllMutation.mutate()}
               disabled={checkAllMutation.isPending}
               data-testid="btn-check-all"
+              title="Força uma verificação imediata (o sistema já verifica automaticamente às 08h e 20h)"
             >
               <RefreshCw className={`h-4 w-4 mr-2 ${checkAllMutation.isPending ? "animate-spin" : ""}`} />
-              Verificar Todos
+              Verificar Agora
             </Button>
             <Button asChild data-testid="btn-add-domain">
               <Link href="/dominios/novo">
