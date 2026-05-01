@@ -7,6 +7,11 @@
 #    - Se Docker NÃO estiver instalado → instalação nativa
 #      (Node.js 20 + PostgreSQL + PM2)
 #
+#  Proteção de dados:
+#    - Backup automático antes de qualquer operação no banco
+#    - Restauração automática se dados forem perdidos
+#    - Nunca apaga dados sem confirmação explícita do usuário
+#
 #  Uso:
 #    curl -fsSL https://raw.githubusercontent.com/semmlerandre/Inventario-TI-Admin/main/deploy.sh | sudo bash
 #    ou:
@@ -17,6 +22,7 @@ set -e
 
 REPO_URL="https://github.com/semmlerandre/Inventario-TI-Admin.git"
 APP_DIR="/opt/inventario-ti"
+BACKUP_DIR="${APP_DIR}/db-backup"
 APP_PORT=5000
 IS_FRESH_INSTALL=false
 USE_DOCKER=false
@@ -31,6 +37,7 @@ log_ok()      { echo -e "${GREEN}[OK]${NC}    $1"; }
 log_warn()    { echo -e "${YELLOW}[AVISO]${NC} $1"; }
 log_error()   { echo -e "${RED}[ERRO]${NC}  $1"; exit 1; }
 log_step()    { echo -e "\n${CYAN}${BOLD}>>> $1${NC}"; }
+log_backup()  { echo -e "${GREEN}[BACKUP]${NC} $1"; }
 
 # ── Banner ──────────────────────────────────────────────────────
 clear
@@ -49,6 +56,186 @@ if [ "$EUID" -ne 0 ]; then
   log_warn "Executando com sudo..."
   exec sudo bash "$0" "$@"
 fi
+
+# ================================================================
+# FUNÇÕES DE BACKUP E RESTAURAÇÃO (Docker)
+# ================================================================
+
+# Realiza backup completo via container Docker
+backup_database_docker() {
+  local db_user="$1" db_name="$2"
+  mkdir -p "$BACKUP_DIR"
+
+  log_step "Fazendo backup do banco de dados antes de atualizar..."
+
+  # Inicia só o container do banco se necessário
+  if ! docker exec inventario-ti-db psql -U "$db_user" -d "$db_name" -c "SELECT 1" &>/dev/null 2>&1; then
+    log_info "Iniciando container do banco para backup..."
+    $COMPOSE_CMD up -d db 2>/dev/null || true
+    local tries=0
+    while [ $tries -lt 12 ]; do
+      sleep 5
+      if docker exec inventario-ti-db psql -U "$db_user" -d "$db_name" -c "SELECT 1" &>/dev/null 2>&1; then
+        break
+      fi
+      tries=$((tries + 1))
+    done
+  fi
+
+  if docker exec inventario-ti-db psql -U "$db_user" -d "$db_name" -c "SELECT 1" &>/dev/null 2>&1; then
+    local backup_file="$BACKUP_DIR/latest.sql"
+    local backup_ts="$BACKUP_DIR/backup_$(date +%Y%m%d_%H%M%S).sql"
+
+    # Dump completo de dados (sem schema, sem DROP)
+    docker exec inventario-ti-db pg_dump \
+      -U "$db_user" \
+      -d "$db_name" \
+      --data-only \
+      --column-inserts \
+      --no-privileges \
+      2>/dev/null > "$backup_file"
+
+    cp "$backup_file" "$backup_ts"
+    echo "$(date '+%Y-%m-%d %H:%M:%S')" > "$BACKUP_DIR/timestamp"
+
+    local size
+    size=$(wc -c < "$backup_file" 2>/dev/null || echo 0)
+    if [ "$size" -gt 100 ]; then
+      log_backup "Backup realizado com sucesso → ${backup_file} (${size} bytes)"
+      log_backup "Cópia histórica → ${backup_ts}"
+      return 0
+    else
+      log_warn "Backup gerado mas parece vazio — banco pode estar sem dados ainda."
+      return 0
+    fi
+  else
+    log_warn "Não foi possível conectar ao banco para backup (pode ser instalação nova)."
+    return 0
+  fi
+}
+
+# Restaura backup se o banco estiver vazio após migrações (Docker)
+restore_database_docker() {
+  local db_user="$1" db_name="$2"
+  local backup_file="$BACKUP_DIR/latest.sql"
+
+  if [ ! -f "$backup_file" ]; then
+    log_info "Nenhum backup encontrado — usando dados padrão."
+    return 0
+  fi
+
+  local size
+  size=$(wc -c < "$backup_file" 2>/dev/null || echo 0)
+  if [ "$size" -le 100 ]; then
+    log_info "Arquivo de backup vazio — pulando restauração."
+    return 0
+  fi
+
+  log_step "Verificando necessidade de restauração de dados..."
+
+  # Aguarda banco ficar disponível
+  local tries=0
+  while [ $tries -lt 12 ]; do
+    sleep 5
+    if docker exec inventario-ti-db psql -U "$db_user" -d "$db_name" -c "SELECT 1" &>/dev/null 2>&1; then
+      break
+    fi
+    tries=$((tries + 1))
+  done
+
+  # Verifica se a tabela settings tem dados
+  local count
+  count=$(docker exec inventario-ti-db psql -U "$db_user" -d "$db_name" -t -c \
+    "SELECT COUNT(*) FROM settings;" 2>/dev/null | tr -d ' \n' || echo "0")
+
+  if [ "$count" = "0" ] || [ -z "$count" ]; then
+    log_backup "Banco vazio detectado — restaurando dados do backup..."
+    docker cp "$backup_file" "inventario-ti-db:/tmp/restore.sql" 2>/dev/null
+
+    # Restaura ignorando erros de conflito (ON CONFLICT silencioso)
+    docker exec inventario-ti-db psql -U "$db_user" -d "$db_name" \
+      -c "SET session_replication_role = replica;" \
+      -f "/tmp/restore.sql" \
+      2>/dev/null && \
+      log_backup "Dados restaurados com sucesso do backup de $(cat "$BACKUP_DIR/timestamp" 2>/dev/null || echo 'data desconhecida')!" || \
+      log_warn "Restauração com avisos (conflitos ignorados — dados existentes foram mantidos)."
+  else
+    log_ok "Banco de dados com ${count} configuração(ões) — dados preservados, restauração não necessária."
+  fi
+}
+
+# ================================================================
+# FUNÇÕES DE BACKUP E RESTAURAÇÃO (Nativo / sem Docker)
+# ================================================================
+
+backup_database_native() {
+  local db_user="$1" db_pass="$2" db_name="$3"
+  mkdir -p "$BACKUP_DIR"
+
+  log_step "Fazendo backup do banco de dados antes de atualizar..."
+
+  if ! PGPASSWORD="$db_pass" psql -U "$db_user" -h localhost -d "$db_name" -c "SELECT 1" &>/dev/null 2>&1; then
+    log_warn "Banco não acessível — pulando backup (pode ser nova instalação)."
+    return 0
+  fi
+
+  local backup_file="$BACKUP_DIR/latest.sql"
+  local backup_ts="$BACKUP_DIR/backup_$(date +%Y%m%d_%H%M%S).sql"
+
+  PGPASSWORD="$db_pass" pg_dump \
+    -U "$db_user" \
+    -h localhost \
+    -d "$db_name" \
+    --data-only \
+    --column-inserts \
+    --no-privileges \
+    2>/dev/null > "$backup_file"
+
+  cp "$backup_file" "$backup_ts"
+  echo "$(date '+%Y-%m-%d %H:%M:%S')" > "$BACKUP_DIR/timestamp"
+
+  local size
+  size=$(wc -c < "$backup_file" 2>/dev/null || echo 0)
+  if [ "$size" -gt 100 ]; then
+    log_backup "Backup realizado → ${backup_file} (${size} bytes)"
+    return 0
+  else
+    log_warn "Backup vazio — banco sem dados ainda."
+    return 0
+  fi
+}
+
+restore_database_native() {
+  local db_user="$1" db_pass="$2" db_name="$3"
+  local backup_file="$BACKUP_DIR/latest.sql"
+
+  if [ ! -f "$backup_file" ]; then
+    log_info "Nenhum backup encontrado — usando dados padrão."
+    return 0
+  fi
+
+  local size
+  size=$(wc -c < "$backup_file" 2>/dev/null || echo 0)
+  if [ "$size" -le 100 ]; then
+    return 0
+  fi
+
+  log_step "Verificando necessidade de restauração de dados..."
+
+  local count
+  count=$(PGPASSWORD="$db_pass" psql -U "$db_user" -h localhost -d "$db_name" -t \
+    -c "SELECT COUNT(*) FROM settings;" 2>/dev/null | tr -d ' \n' || echo "0")
+
+  if [ "$count" = "0" ] || [ -z "$count" ]; then
+    log_backup "Restaurando dados do backup..."
+    PGPASSWORD="$db_pass" psql -U "$db_user" -h localhost -d "$db_name" \
+      -f "$backup_file" 2>/dev/null && \
+      log_backup "Dados restaurados do backup de $(cat "$BACKUP_DIR/timestamp" 2>/dev/null || echo 'data desconhecida')!" || \
+      log_warn "Restauração com avisos (conflitos ignorados)."
+  else
+    log_ok "Banco já tem dados — restauração não necessária."
+  fi
+}
 
 # ================================================================
 # DETECTAR MODO: DOCKER ou NATIVO
@@ -97,7 +284,6 @@ install_node() {
       yum install -y nodejs
       ;;
     *)
-      # Fallback via NVM
       log_warn "Distribuição não reconhecida. Instalando Node.js via NVM..."
       export NVM_DIR="/root/.nvm"
       curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
@@ -162,7 +348,6 @@ setup_postgres_db() {
     sudo -u postgres psql -c "CREATE DATABASE ${db_name} OWNER ${db_user};" && \
     log_ok "Banco '${db_name}' criado."
 
-  # Garante privilégios
   sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE ${db_name} TO ${db_user};" 2>/dev/null || true
   log_ok "Banco de dados configurado."
 }
@@ -227,16 +412,16 @@ if [ "$USE_DOCKER" = true ]; then
   fi
 
   # ── Detectar volume existente do banco (fonte de verdade) ─────
-  # Usa o nome do volume Docker como critério real (não o .git),
-  # pois o Postgres ignora variáveis de ambiente se o volume já tem dados.
+  # IMPORTANTE: O nome do projeto Docker Compose preserva hífens.
+  # Ex: diretório "inventario-ti" → volume "inventario-ti_postgres_data"
   log_step "Verificando volumes do banco de dados..."
-  PROJECT_NAME=$(basename "$APP_DIR" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]//g')
+  PROJECT_NAME=$(basename "$APP_DIR" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9-]//g')
   POSTGRES_VOLUME="${PROJECT_NAME}_postgres_data"
   DB_VOLUME_EXISTS=false
 
   if docker volume inspect "$POSTGRES_VOLUME" &>/dev/null 2>&1; then
     DB_VOLUME_EXISTS=true
-    log_ok "Volume do banco encontrado: ${POSTGRES_VOLUME} (dados preservados)"
+    log_ok "Volume do banco encontrado: ${POSTGRES_VOLUME} (dados serão preservados)"
   else
     DB_VOLUME_EXISTS=false
     log_info "Nenhum volume de banco existente — instalação limpa."
@@ -248,13 +433,11 @@ if [ "$USE_DOCKER" = true ]; then
   DB_NAME_ENV=$(grep "^DB_NAME="     .env 2>/dev/null | cut -d= -f2 | tr -d ' ' || echo "inventario")
 
   # ── Verificar conflito de credenciais ─────────────────────────
-  # Se o volume existe, testa se as credenciais do .env conseguem conectar
   if [ "$DB_VOLUME_EXISTS" = true ]; then
     log_info "Verificando credenciais do banco de dados..."
     $COMPOSE_CMD up -d db 2>/dev/null || true
     sleep 8
 
-    # Testa conexão com as credenciais atuais
     CRED_OK=false
     if docker exec inventario-ti-db \
         psql -U "$DB_USER_ENV" -d "$DB_NAME_ENV" -c "SELECT 1;" &>/dev/null 2>&1; then
@@ -262,9 +445,8 @@ if [ "$USE_DOCKER" = true ]; then
       log_ok "Credenciais verificadas — banco acessível."
     fi
 
-    $COMPOSE_CMD down --remove-orphans 2>/dev/null || true
-
     if [ "$CRED_OK" = false ]; then
+      $COMPOSE_CMD down --remove-orphans 2>/dev/null || true
       echo ""
       echo -e "${RED}${BOLD}"
       echo "  ╔══════════════════════════════════════════════════════╗"
@@ -314,6 +496,11 @@ if [ "$USE_DOCKER" = true ]; then
     fi
   fi
 
+  # ── BACKUP antes de qualquer operação destrutiva ──────────────
+  if [ "$DB_VOLUME_EXISTS" = true ]; then
+    backup_database_docker "$DB_USER_ENV" "$DB_NAME_ENV"
+  fi
+
   # ── Parar containers ──────────────────────────────────────────
   log_step "Preparando containers..."
   if [ "$DB_VOLUME_EXISTS" = false ]; then
@@ -321,7 +508,7 @@ if [ "$USE_DOCKER" = true ]; then
     log_info "Ambiente limpo para nova instalação."
   else
     $COMPOSE_CMD down --remove-orphans 2>/dev/null || true
-    log_info "Dados do banco preservados."
+    log_info "Dados do banco preservados no volume ${POSTGRES_VOLUME}."
   fi
 
   # ── Build + Start ──────────────────────────────────────────────
@@ -333,11 +520,14 @@ if [ "$USE_DOCKER" = true ]; then
   $COMPOSE_CMD up -d
   log_ok "Containers iniciados!"
 
-  # ── Aguardar e exibir status ───────────────────────────────────
+  # ── Aguardar banco ficar pronto e aplicar migrações ──────────
   log_info "Aguardando inicialização da aplicação (banco + migrações)..."
   sleep 25
 
-  # Verifica se a migração falhou por erro de autenticação
+  # ── RESTAURAR backup se banco estiver vazio ───────────────────
+  restore_database_docker "$DB_USER_ENV" "$DB_NAME_ENV"
+
+  # Verifica se houve erro de autenticação
   LOGS_APP=$($COMPOSE_CMD logs --tail=60 app 2>/dev/null || true)
   if echo "$LOGS_APP" | grep -q "password authentication failed"; then
     echo ""
@@ -380,6 +570,8 @@ if [ "$USE_DOCKER" = true ]; then
     echo -e "${NC}"
     echo -e "  ${GREEN}Aplicação:${NC}  http://localhost:${APP_PORT}"
     [ -n "$SERVER_IP" ] && echo -e "  ${GREEN}Rede local:${NC} http://${SERVER_IP}:${APP_PORT}"
+    echo ""
+    echo -e "  ${CYAN}Backups do banco:${NC}  ${BACKUP_DIR}/"
     echo ""
     echo -e "  ${CYAN}Credenciais padrão:${NC}"
     echo -e "    Usuário: ${GREEN}admin${NC}"
@@ -437,7 +629,6 @@ EOF
   log_warn "Senha do banco gerada automaticamente. Guarde-a!"
 else
   log_ok "Arquivo .env já existe, mantendo configurações."
-  # Garante que DATABASE_URL existe no .env
   if ! grep -q "^DATABASE_URL=" .env; then
     DB_USER=$(grep "^DB_USER=" .env | cut -d= -f2)
     DB_PASS=$(grep "^DB_PASSWORD=" .env | cut -d= -f2)
@@ -450,11 +641,15 @@ fi
 # Carrega variáveis
 set -a; source .env 2>/dev/null || true; set +a
 
-# ── Configurar banco ───────────────────────────────────────────
+# ── Carregar variáveis do banco ────────────────────────────────
 DB_USER=$(grep "^DB_USER=" .env | cut -d= -f2 | tr -d ' ')
 DB_PASS=$(grep "^DB_PASSWORD=" .env | cut -d= -f2 | tr -d ' ')
 DB_NAME=$(grep "^DB_NAME=" .env | cut -d= -f2 | tr -d ' ')
 
+# ── BACKUP antes de atualizar ──────────────────────────────────
+backup_database_native "$DB_USER" "$DB_PASS" "$DB_NAME"
+
+# ── Configurar banco ───────────────────────────────────────────
 setup_postgres_db "$DB_USER" "$DB_PASS" "$DB_NAME"
 
 # ── Instalar dependências Node ─────────────────────────────────
@@ -480,10 +675,12 @@ for i in $(seq 1 $MAX_TRIES); do
   }
 done
 
+# ── RESTAURAR backup se banco estiver vazio ────────────────────
+restore_database_native "$DB_USER" "$DB_PASS" "$DB_NAME"
+
 # ── PM2: iniciar / reiniciar ───────────────────────────────────
 log_step "Gerenciando processo com PM2..."
 
-# Gera arquivo ecosystem para PM2
 cat > ecosystem.config.cjs << EOF
 module.exports = {
   apps: [{
@@ -515,7 +712,6 @@ fi
 
 pm2 save
 
-# Configurar inicialização automática
 pm2 startup 2>/dev/null | tail -1 | bash 2>/dev/null || \
   log_warn "Configure manualmente o startup do PM2: 'pm2 startup'"
 
@@ -531,6 +727,8 @@ echo "  ╚═══════════════════════
 echo -e "${NC}"
 echo -e "  ${GREEN}Aplicação:${NC}  http://localhost:${APP_PORT}"
 [ -n "$SERVER_IP" ] && echo -e "  ${GREEN}Rede local:${NC} http://${SERVER_IP}:${APP_PORT}"
+echo ""
+echo -e "  ${CYAN}Backups do banco:${NC}  ${BACKUP_DIR}/"
 echo ""
 echo -e "  ${CYAN}Credenciais padrão:${NC}"
 echo -e "    Usuário: ${GREEN}admin${NC}"

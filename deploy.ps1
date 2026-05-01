@@ -10,6 +10,8 @@
 #    - Docker Desktop é OBRIGATÓRIO no Windows
 #    - Se não estiver instalado, tenta instalar via winget
 #    - Detecta instalação existente vs. nova automaticamente
+#    - Faz backup automático do banco antes de qualquer operação
+#    - Restaura dados automaticamente se necessário
 #
 #  Como usar (PowerShell como Administrador):
 #    Set-ExecutionPolicy Bypass -Scope Process -Force
@@ -27,6 +29,8 @@ param(
 
 $ErrorActionPreference = "Stop"
 $ProgressPreference    = "SilentlyContinue"
+
+$BackupDir = Join-Path $AppDir "db-backup"
 
 # ── Funções de log ───────────────────────────────────────────────
 function Write-Banner {
@@ -46,6 +50,7 @@ function Write-Step   { param($msg) Write-Host "`n>>> $msg" -ForegroundColor Cya
 function Write-Info   { param($msg) Write-Host "  [INFO]  $msg" -ForegroundColor White }
 function Write-Ok     { param($msg) Write-Host "  [OK]    $msg" -ForegroundColor Green }
 function Write-Warn   { param($msg) Write-Host "  [AVISO] $msg" -ForegroundColor Yellow }
+function Write-Backup { param($msg) Write-Host "  [BACKUP] $msg" -ForegroundColor Green }
 function Write-Fail   { param($msg) Write-Host "  [ERRO]  $msg" -ForegroundColor Red; exit 1 }
 
 function Invoke-Compose {
@@ -71,6 +76,124 @@ function Get-RandomSecret {
     param([int]$Length = 64)
     $chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
     return -join (1..$Length | ForEach-Object { $chars[(Get-Random -Maximum $chars.Length)] })
+}
+
+# ── Funções de Backup/Restore (Docker) ──────────────────────────
+function Backup-DatabaseDocker {
+    param([string]$DbUser, [string]$DbName)
+
+    Write-Step "Fazendo backup do banco de dados antes de atualizar..."
+
+    if (-not (Test-Path $script:BackupDir)) {
+        New-Item -ItemType Directory -Force -Path $script:BackupDir | Out-Null
+    }
+
+    # Garante que o container do banco está rodando
+    $containerRunning = $false
+    try {
+        $r = docker exec inventario-ti-db psql -U $DbUser -d $DbName -c "SELECT 1;" 2>&1
+        $containerRunning = ($LASTEXITCODE -eq 0)
+    } catch { }
+
+    if (-not $containerRunning) {
+        Write-Info "Iniciando container do banco para backup..."
+        Invoke-Expression "$($script:ComposeCmd) up -d db 2>&1" | Out-Null
+        $tries = 0
+        while ($tries -lt 12) {
+            Start-Sleep -Seconds 5
+            try {
+                docker exec inventario-ti-db psql -U $DbUser -d $DbName -c "SELECT 1;" 2>&1 | Out-Null
+                if ($LASTEXITCODE -eq 0) { $containerRunning = $true; break }
+            } catch { }
+            $tries++
+        }
+    }
+
+    if ($containerRunning) {
+        $timestamp  = Get-Date -Format "yyyyMMdd_HHmmss"
+        $backupFile = Join-Path $script:BackupDir "latest.sql"
+        $backupTs   = Join-Path $script:BackupDir "backup_${timestamp}.sql"
+
+        docker exec inventario-ti-db pg_dump `
+            -U $DbUser `
+            -d $DbName `
+            --data-only `
+            --column-inserts `
+            --no-privileges 2>$null | Set-Content $backupFile -Encoding UTF8
+
+        if (Test-Path $backupFile) {
+            Copy-Item $backupFile $backupTs -Force
+            $size = (Get-Item $backupFile).Length
+            Get-Date -Format "yyyy-MM-dd HH:mm:ss" | Set-Content (Join-Path $script:BackupDir "timestamp") -Encoding UTF8
+
+            if ($size -gt 100) {
+                Write-Backup "Backup realizado → $backupFile ($size bytes)"
+                Write-Backup "Cópia histórica → $backupTs"
+            } else {
+                Write-Warn "Backup vazio — banco pode não ter dados ainda."
+            }
+        }
+    } else {
+        Write-Warn "Não foi possível conectar ao banco para backup (pode ser nova instalação)."
+    }
+}
+
+function Restore-DatabaseDocker {
+    param([string]$DbUser, [string]$DbName)
+
+    $backupFile = Join-Path $script:BackupDir "latest.sql"
+    if (-not (Test-Path $backupFile)) {
+        Write-Info "Nenhum backup encontrado — usando dados padrão."
+        return
+    }
+
+    $size = (Get-Item $backupFile).Length
+    if ($size -le 100) {
+        Write-Info "Arquivo de backup vazio — pulando restauração."
+        return
+    }
+
+    Write-Step "Verificando necessidade de restauração de dados..."
+
+    # Aguarda banco ficar disponível
+    $tries = 0
+    $dbReady = $false
+    while ($tries -lt 12) {
+        Start-Sleep -Seconds 5
+        try {
+            docker exec inventario-ti-db psql -U $DbUser -d $DbName -c "SELECT 1;" 2>&1 | Out-Null
+            if ($LASTEXITCODE -eq 0) { $dbReady = $true; break }
+        } catch { }
+        $tries++
+    }
+
+    if (-not $dbReady) {
+        Write-Warn "Banco não ficou disponível para restauração."
+        return
+    }
+
+    $countResult = docker exec inventario-ti-db psql -U $DbUser -d $DbName -t -c "SELECT COUNT(*) FROM settings;" 2>&1
+    $count = ($countResult | Select-Object -Last 1).Trim()
+
+    if ($count -eq "0" -or [string]::IsNullOrWhiteSpace($count)) {
+        Write-Backup "Banco vazio detectado — restaurando dados do backup..."
+
+        $timestampFile = Join-Path $script:BackupDir "timestamp"
+        $backupDate = if (Test-Path $timestampFile) { Get-Content $timestampFile } else { "data desconhecida" }
+
+        docker cp $backupFile "inventario-ti-db:/tmp/restore.sql" 2>&1 | Out-Null
+        docker exec inventario-ti-db psql -U $DbUser -d $DbName `
+            -c "SET session_replication_role = replica;" `
+            -f "/tmp/restore.sql" 2>&1 | Out-Null
+
+        if ($LASTEXITCODE -eq 0) {
+            Write-Backup "Dados restaurados com sucesso (backup de $backupDate)!"
+        } else {
+            Write-Warn "Restauração com avisos — conflitos ignorados, dados existentes mantidos."
+        }
+    } else {
+        Write-Ok "Banco de dados com $count configuração(ões) — dados preservados, restauração não necessária."
+    }
 }
 
 # ================================================================
@@ -141,7 +264,6 @@ if (-not $dockerRunning) {
     Write-Warn "Docker Desktop não encontrado ou não está em execução."
     Write-Host ""
 
-    # ── Tentar instalar via winget ────────────────────────────
     $wingetAvailable = $false
     try {
         winget --version 2>&1 | Out-Null
@@ -170,7 +292,6 @@ if (-not $dockerRunning) {
         }
     }
 
-    # ── Fallback: baixar instalador manualmente ───────────────
     Write-Host ""
     Write-Host "  ╔══════════════════════════════════════════════════╗" -ForegroundColor Yellow
     Write-Host "  ║  Docker Desktop é OBRIGATÓRIO no Windows!        ║" -ForegroundColor Yellow
@@ -205,7 +326,6 @@ if (-not $dockerRunning) {
 
 Write-Ok "Docker está em execução: $(docker --version)"
 
-# ── Detectar Docker Compose ───────────────────────────────────
 try {
     docker compose version 2>&1 | Out-Null
     if ($LASTEXITCODE -eq 0) {
@@ -298,7 +418,6 @@ if (-not (Test-Path ".env")) {
     if (Test-Path ".env.example") {
         Copy-Item ".env.example" ".env"
     } else {
-        # Cria .env mínimo se não existir .env.example
         @"
 APP_PORT=5000
 DB_USER=inventario
@@ -323,13 +442,18 @@ SESSION_SECRET=PLACEHOLDER
     Write-Ok "Arquivo .env já existe, mantendo configurações."
 }
 
+# Carrega variáveis do .env
+$envLines = Get-Content ".env" -ErrorAction SilentlyContinue
+
 # ================================================================
 # PASSO 6: Verificar volume do banco (fonte de verdade real)
 # ================================================================
 Write-Step "Verificando volumes do banco de dados..."
 
-# O nome do volume Docker é baseado no nome do diretório (project name)
-$projectName   = (Split-Path $AppDir -Leaf).ToLower() -replace '[^a-z0-9]', ''
+# IMPORTANTE: Docker Compose preserva hífens no nome do projeto.
+# Ex: diretório "inventario-ti" → projeto "inventario-ti" → volume "inventario-ti_postgres_data"
+# NÃO remover hífens do nome — manter -replace '[^a-z0-9-]', ''
+$projectName    = (Split-Path $AppDir -Leaf).ToLower() -replace '[^a-z0-9-]', ''
 $postgresVolume = "${projectName}_postgres_data"
 
 $dbVolumeExists = $false
@@ -341,11 +465,13 @@ try {
 if ($dbVolumeExists) {
     Write-Ok "Volume do banco encontrado: $postgresVolume (dados serão preservados)"
 
-    # ── Verificar se as credenciais do .env batem com o volume ───
-    Write-Info "Verificando credenciais do banco de dados..."
+    # Carrega credenciais do .env para verificação
     $dbUser = ($envLines | Where-Object { $_ -match "^DB_USER=" }     | Select-Object -First 1) -replace "^DB_USER=", ""
     $dbName = ($envLines | Where-Object { $_ -match "^DB_NAME=" }     | Select-Object -First 1) -replace "^DB_NAME=", ""
+    $dbUser = $dbUser.Trim()
+    $dbName = $dbName.Trim()
 
+    Write-Info "Verificando credenciais do banco de dados..."
     Invoke-Expression "$($script:ComposeCmd) up -d db 2>&1" | Out-Null
     Start-Sleep -Seconds 10
 
@@ -355,9 +481,8 @@ if ($dbVolumeExists) {
         $credOk = ($LASTEXITCODE -eq 0)
     } catch { }
 
-    Invoke-Expression "$($script:ComposeCmd) down --remove-orphans 2>&1" | Out-Null
-
     if (-not $credOk) {
+        Invoke-Expression "$($script:ComposeCmd) down --remove-orphans 2>&1" | Out-Null
         Write-Host ""
         Write-Host "  ╔════════════════════════════════════════════════════╗" -ForegroundColor Red
         Write-Host "  ║   CONFLITO DE CREDENCIAIS DETECTADO               ║" -ForegroundColor Red
@@ -404,6 +529,10 @@ if ($dbVolumeExists) {
         }
     } else {
         Write-Ok "Credenciais verificadas — banco acessível."
+
+        # ── BACKUP antes de qualquer operação ──────────────────
+        $script:BackupDir = $BackupDir
+        Backup-DatabaseDocker -DbUser $dbUser -DbName $dbName
     }
 } else {
     Write-Info "Nenhum volume de banco existente — instalação limpa."
@@ -418,7 +547,7 @@ if (-not $dbVolumeExists) {
     Write-Info "Removendo volumes antigos (nova instalação limpa)..."
     Invoke-Expression "$($script:ComposeCmd) down --volumes --remove-orphans 2>&1" | Out-Null
 } else {
-    Write-Info "Parando containers (dados do banco preservados)..."
+    Write-Info "Parando containers (dados do banco preservados no volume $postgresVolume)..."
     Invoke-Expression "$($script:ComposeCmd) down --remove-orphans 2>&1" | Out-Null
 }
 
@@ -433,10 +562,18 @@ if ($LASTEXITCODE -ne 0) { Write-Fail "Falha ao iniciar os containers." }
 Write-Ok "Containers iniciados!"
 
 # ================================================================
-# PASSO 8: Status final
+# PASSO 8: Aguardar, restaurar e verificar
 # ================================================================
 Write-Step "Aguardando aplicação inicializar (banco + migrações)..."
 Start-Sleep -Seconds 25
+
+# ── RESTAURAR backup se banco estiver vazio ────────────────────
+if ($dbVolumeExists -or (Test-Path (Join-Path $BackupDir "latest.sql"))) {
+    $dbUser = ($envLines | Where-Object { $_ -match "^DB_USER=" } | Select-Object -First 1) -replace "^DB_USER=", ""
+    $dbName = ($envLines | Where-Object { $_ -match "^DB_NAME=" } | Select-Object -First 1) -replace "^DB_NAME=", ""
+    $script:BackupDir = $BackupDir
+    Restore-DatabaseDocker -DbUser $dbUser.Trim() -DbName $dbName.Trim()
+}
 
 # Verificar erro de autenticação nos logs
 $appLogs = Invoke-Expression "$($script:ComposeCmd) logs --tail=60 app 2>&1"
@@ -463,7 +600,6 @@ if ($appLogs -match "password authentication failed") {
 }
 
 # Ler porta do .env
-$envLines = Get-Content ".env" -ErrorAction SilentlyContinue
 $portLine  = $envLines | Where-Object { $_ -match "^APP_PORT=" }
 $appPort   = if ($portLine) { ($portLine -split "=")[1].Trim() } else { "5000" }
 
@@ -488,6 +624,8 @@ if ($isUp) {
     if ($serverIP) {
         Write-Host "  Rede local: http://${serverIP}:$appPort" -ForegroundColor Green
     }
+    Write-Host ""
+    Write-Host "  Backups do banco:  $BackupDir\" -ForegroundColor Cyan
     Write-Host ""
     Write-Host "  Credenciais padrão:" -ForegroundColor Cyan
     Write-Host "    Usuário: admin"    -ForegroundColor White
@@ -514,8 +652,5 @@ if ($isUp) {
     Write-Host "    $($script:ComposeCmd) logs app"                 -ForegroundColor White
     Write-Host ""
     Invoke-Expression "$($script:ComposeCmd) ps"
-    Write-Host ""
     Invoke-Expression "$($script:ComposeCmd) logs --tail=50 app"
 }
-
-Write-Host ""
