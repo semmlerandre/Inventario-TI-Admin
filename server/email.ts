@@ -8,6 +8,7 @@ export interface DomainAlertOptions {
   daysLeft: number;
   expirationDate: Date;
   interval: number;
+  provider?: string;
 }
 
 export async function sendDomainAlert(opts: DomainAlertOptions) {
@@ -65,6 +66,11 @@ export async function sendDomainAlert(opts: DomainAlertOptions) {
           <span style="color:#718096;font-size:14px;display:block">Dias restantes</span>
           <span style="color:#c53030;font-weight:700;font-size:20px">${opts.daysLeft} dias</span>
         </div>
+        ${opts.provider ? `
+        <div style="margin-bottom:10px;border-bottom:1px solid #edf2f7;padding-bottom:8px">
+          <span style="color:#718096;font-size:14px;display:block">Provedor / Registrador</span>
+          <span style="color:#2d3748;font-weight:600;font-size:16px">${opts.provider}</span>
+        </div>` : ""}
         <div style="margin-bottom:0">
           <span style="color:#718096;font-size:14px;display:block">Data de vencimento</span>
           <span style="color:#2d3748;font-weight:600;font-size:16px">${expirationStr}</span>
@@ -84,7 +90,7 @@ export async function sendDomainAlert(opts: DomainAlertOptions) {
     to: opts.to,
     subject,
     html,
-    text: `${subject}\n\nDomínio: ${opts.domainName}\nTipo: ${typeLabel}\nDias restantes: ${opts.daysLeft}\nVencimento: ${expirationStr}`,
+    text: `${subject}\n\nDomínio: ${opts.domainName}\nTipo: ${typeLabel}${opts.provider ? `\nProvedor / Registrador: ${opts.provider}` : ""}\nDias restantes: ${opts.daysLeft}\nVencimento: ${expirationStr}`,
   });
 
   console.log(`[EMAIL-DOMAIN] Enviado: ${subject} → ${opts.to}`);

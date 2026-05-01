@@ -48,6 +48,7 @@ async function runDomainChecks() {
                       daysLeft: sslDays,
                       expirationDate: sslInfo.expirationDate!,
                       interval,
+                      provider: domain.provider ?? undefined,
                     });
                     alertsEnviados++;
                   }
@@ -89,6 +90,7 @@ async function runDomainChecks() {
                       daysLeft: domainDays,
                       expirationDate: domain.renewalDate,
                       interval,
+                      provider: domain.provider ?? undefined,
                     });
                     alertsEnviados++;
                   }
