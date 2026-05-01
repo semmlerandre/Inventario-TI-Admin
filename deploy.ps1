@@ -324,11 +324,97 @@ SESSION_SECRET=PLACEHOLDER
 }
 
 # ================================================================
-# PASSO 6: Docker Compose — build e start
+# PASSO 6: Verificar volume do banco (fonte de verdade real)
+# ================================================================
+Write-Step "Verificando volumes do banco de dados..."
+
+# O nome do volume Docker é baseado no nome do diretório (project name)
+$projectName   = (Split-Path $AppDir -Leaf).ToLower() -replace '[^a-z0-9]', ''
+$postgresVolume = "${projectName}_postgres_data"
+
+$dbVolumeExists = $false
+try {
+    docker volume inspect $postgresVolume 2>&1 | Out-Null
+    $dbVolumeExists = ($LASTEXITCODE -eq 0)
+} catch { }
+
+if ($dbVolumeExists) {
+    Write-Ok "Volume do banco encontrado: $postgresVolume (dados serão preservados)"
+
+    # ── Verificar se as credenciais do .env batem com o volume ───
+    Write-Info "Verificando credenciais do banco de dados..."
+    $dbUser = ($envLines | Where-Object { $_ -match "^DB_USER=" }     | Select-Object -First 1) -replace "^DB_USER=", ""
+    $dbName = ($envLines | Where-Object { $_ -match "^DB_NAME=" }     | Select-Object -First 1) -replace "^DB_NAME=", ""
+
+    Invoke-Expression "$($script:ComposeCmd) up -d db 2>&1" | Out-Null
+    Start-Sleep -Seconds 10
+
+    $credOk = $false
+    try {
+        $testResult = docker exec inventario-ti-db psql -U $dbUser -d $dbName -c "SELECT 1;" 2>&1
+        $credOk = ($LASTEXITCODE -eq 0)
+    } catch { }
+
+    Invoke-Expression "$($script:ComposeCmd) down --remove-orphans 2>&1" | Out-Null
+
+    if (-not $credOk) {
+        Write-Host ""
+        Write-Host "  ╔════════════════════════════════════════════════════╗" -ForegroundColor Red
+        Write-Host "  ║   CONFLITO DE CREDENCIAIS DETECTADO               ║" -ForegroundColor Red
+        Write-Host "  ╠════════════════════════════════════════════════════╣" -ForegroundColor Red
+        Write-Host "  ║  O banco já existe com credenciais diferentes     ║" -ForegroundColor Red
+        Write-Host "  ║  das que estão no arquivo .env atual.             ║" -ForegroundColor Red
+        Write-Host "  ╚════════════════════════════════════════════════════╝" -ForegroundColor Red
+        Write-Host ""
+        Write-Host "  Escolha uma opção:" -ForegroundColor Yellow
+        Write-Host ""
+        Write-Host "  [1] Corrigir o .env para usar as credenciais antigas" -ForegroundColor Green
+        Write-Host "      (recomendado se você tem dados importantes)"       -ForegroundColor Gray
+        Write-Host ""
+        Write-Host "  [2] Apagar o banco e reinstalar do zero"    -ForegroundColor Red
+        Write-Host "      ATENCAO: todos os dados serao perdidos!" -ForegroundColor Red
+        Write-Host ""
+        Write-Host "  [3] Cancelar" -ForegroundColor Yellow
+        Write-Host ""
+        $choice = Read-Host "  Digite 1, 2 ou 3 e pressione ENTER"
+
+        switch ($choice) {
+            "1" {
+                Write-Host ""
+                Write-Warn "Abra e edite o arquivo .env:"
+                Write-Host "  $AppDir\.env" -ForegroundColor Cyan
+                Write-Host ""
+                Write-Host "  Ajuste DB_USER, DB_PASSWORD e DB_NAME para os valores" -ForegroundColor Yellow
+                Write-Host "  usados quando o banco foi criado pela primeira vez."    -ForegroundColor Yellow
+                Write-Host ""
+                Write-Host "  Depois execute o script novamente:" -ForegroundColor Yellow
+                Write-Host "  powershell -ExecutionPolicy Bypass -File $AppDir\deploy.ps1" -ForegroundColor White
+                Pause; exit 0
+            }
+            "2" {
+                Write-Warn "Removendo volume do banco (dados serao perdidos)..."
+                docker volume rm $postgresVolume 2>&1 | Out-Null
+                $dbVolumeExists = $false
+                Write-Ok "Volume removido. Continuando com instalacao limpa..."
+            }
+            default {
+                Write-Info "Operacao cancelada."
+                exit 0
+            }
+        }
+    } else {
+        Write-Ok "Credenciais verificadas — banco acessível."
+    }
+} else {
+    Write-Info "Nenhum volume de banco existente — instalação limpa."
+}
+
+# ================================================================
+# PASSO 7: Docker Compose — build e start
 # ================================================================
 Write-Step "Preparando containers..."
 
-if ($isFreshInstall) {
+if (-not $dbVolumeExists) {
     Write-Info "Removendo volumes antigos (nova instalação limpa)..."
     Invoke-Expression "$($script:ComposeCmd) down --volumes --remove-orphans 2>&1" | Out-Null
 } else {
@@ -347,10 +433,34 @@ if ($LASTEXITCODE -ne 0) { Write-Fail "Falha ao iniciar os containers." }
 Write-Ok "Containers iniciados!"
 
 # ================================================================
-# PASSO 7: Status final
+# PASSO 8: Status final
 # ================================================================
 Write-Step "Aguardando aplicação inicializar (banco + migrações)..."
 Start-Sleep -Seconds 25
+
+# Verificar erro de autenticação nos logs
+$appLogs = Invoke-Expression "$($script:ComposeCmd) logs --tail=60 app 2>&1"
+if ($appLogs -match "password authentication failed") {
+    Write-Host ""
+    Write-Host "  ╔═══════════════════════════════════════════════════════╗" -ForegroundColor Red
+    Write-Host "  ║   ERRO: Falha de autenticacao no banco de dados       ║" -ForegroundColor Red
+    Write-Host "  ╠═══════════════════════════════════════════════════════╣" -ForegroundColor Red
+    Write-Host "  ║  O volume do banco foi criado com credenciais         ║" -ForegroundColor Red
+    Write-Host "  ║  diferentes das que estao no .env atual.              ║" -ForegroundColor Red
+    Write-Host "  ╚═══════════════════════════════════════════════════════╝" -ForegroundColor Red
+    Write-Host ""
+    Write-Host "  Opcao A — Corrija o .env:" -ForegroundColor Green
+    Write-Host "    Ajuste DB_USER, DB_PASSWORD, DB_NAME em: $AppDir\.env" -ForegroundColor White
+    Write-Host "    Execute o script novamente."                            -ForegroundColor White
+    Write-Host ""
+    Write-Host "  Opcao B — Reinstalar do zero (apaga todos os dados):" -ForegroundColor Red
+    Write-Host "    cd $AppDir"                                          -ForegroundColor White
+    Write-Host "    $($script:ComposeCmd) down --volumes"               -ForegroundColor White
+    Write-Host "    powershell -ExecutionPolicy Bypass -File deploy.ps1" -ForegroundColor White
+    Write-Host ""
+    Invoke-Expression "$($script:ComposeCmd) logs --tail=30 app"
+    exit 1
+}
 
 # Ler porta do .env
 $envLines = Get-Content ".env" -ErrorAction SilentlyContinue

@@ -226,9 +226,97 @@ if [ "$USE_DOCKER" = true ]; then
     log_ok "Arquivo .env já existe, mantendo configurações."
   fi
 
+  # ── Detectar volume existente do banco (fonte de verdade) ─────
+  # Usa o nome do volume Docker como critério real (não o .git),
+  # pois o Postgres ignora variáveis de ambiente se o volume já tem dados.
+  log_step "Verificando volumes do banco de dados..."
+  PROJECT_NAME=$(basename "$APP_DIR" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]//g')
+  POSTGRES_VOLUME="${PROJECT_NAME}_postgres_data"
+  DB_VOLUME_EXISTS=false
+
+  if docker volume inspect "$POSTGRES_VOLUME" &>/dev/null 2>&1; then
+    DB_VOLUME_EXISTS=true
+    log_ok "Volume do banco encontrado: ${POSTGRES_VOLUME} (dados preservados)"
+  else
+    DB_VOLUME_EXISTS=false
+    log_info "Nenhum volume de banco existente — instalação limpa."
+  fi
+
+  # ── Carregar credenciais do .env ──────────────────────────────
+  DB_USER_ENV=$(grep "^DB_USER="     .env 2>/dev/null | cut -d= -f2 | tr -d ' ' || echo "inventario")
+  DB_PASS_ENV=$(grep "^DB_PASSWORD=" .env 2>/dev/null | cut -d= -f2 | tr -d ' ' || echo "inventario123")
+  DB_NAME_ENV=$(grep "^DB_NAME="     .env 2>/dev/null | cut -d= -f2 | tr -d ' ' || echo "inventario")
+
+  # ── Verificar conflito de credenciais ─────────────────────────
+  # Se o volume existe, testa se as credenciais do .env conseguem conectar
+  if [ "$DB_VOLUME_EXISTS" = true ]; then
+    log_info "Verificando credenciais do banco de dados..."
+    $COMPOSE_CMD up -d db 2>/dev/null || true
+    sleep 8
+
+    # Testa conexão com as credenciais atuais
+    CRED_OK=false
+    if docker exec inventario-ti-db \
+        psql -U "$DB_USER_ENV" -d "$DB_NAME_ENV" -c "SELECT 1;" &>/dev/null 2>&1; then
+      CRED_OK=true
+      log_ok "Credenciais verificadas — banco acessível."
+    fi
+
+    $COMPOSE_CMD down --remove-orphans 2>/dev/null || true
+
+    if [ "$CRED_OK" = false ]; then
+      echo ""
+      echo -e "${RED}${BOLD}"
+      echo "  ╔══════════════════════════════════════════════════════╗"
+      echo "  ║   CONFLITO DE CREDENCIAIS DETECTADO                  ║"
+      echo "  ╠══════════════════════════════════════════════════════╣"
+      echo "  ║  O banco de dados já existe com credenciais          ║"
+      echo "  ║  diferentes das que estão no arquivo .env.           ║"
+      echo "  ╚══════════════════════════════════════════════════════╝"
+      echo -e "${NC}"
+      echo -e "  ${YELLOW}Escolha uma opção:${NC}"
+      echo ""
+      echo -e "  ${GREEN}[1]${NC} Corrigir o .env para usar as credenciais antigas"
+      echo -e "      (recomendado se você tem dados importantes)"
+      echo ""
+      echo -e "  ${RED}[2]${NC} Apagar o banco e reinstalar do zero"
+      echo -e "      ${RED}ATENÇÃO: todos os dados serão perdidos!${NC}"
+      echo ""
+      echo -e "  ${YELLOW}[3]${NC} Cancelar"
+      echo ""
+      echo -n "  Digite 1, 2 ou 3 e pressione ENTER: "
+      read -r CHOICE
+
+      case "$CHOICE" in
+        1)
+          echo ""
+          log_warn "Abra o arquivo .env e ajuste DB_USER, DB_PASSWORD e DB_NAME"
+          log_warn "para corresponder às credenciais usadas na instalação anterior."
+          echo ""
+          echo -e "  Arquivo: ${CYAN}${APP_DIR}/.env${NC}"
+          echo ""
+          echo -e "  ${YELLOW}Após editar o .env, execute o script novamente:${NC}"
+          echo -e "    sudo bash ${APP_DIR}/deploy.sh"
+          exit 0
+          ;;
+        2)
+          echo ""
+          log_warn "Removendo volume do banco de dados (dados serão perdidos)..."
+          docker volume rm "$POSTGRES_VOLUME" 2>/dev/null || true
+          DB_VOLUME_EXISTS=false
+          log_ok "Volume removido. Continuando com instalação limpa..."
+          ;;
+        *)
+          log_info "Operação cancelada."
+          exit 0
+          ;;
+      esac
+    fi
+  fi
+
   # ── Parar containers ──────────────────────────────────────────
   log_step "Preparando containers..."
-  if [ "$IS_FRESH_INSTALL" = true ]; then
+  if [ "$DB_VOLUME_EXISTS" = false ]; then
     $COMPOSE_CMD down --volumes --remove-orphans 2>/dev/null || true
     log_info "Ambiente limpo para nova instalação."
   else
@@ -246,8 +334,38 @@ if [ "$USE_DOCKER" = true ]; then
   log_ok "Containers iniciados!"
 
   # ── Aguardar e exibir status ───────────────────────────────────
-  log_info "Aguardando inicialização da aplicação..."
-  sleep 20
+  log_info "Aguardando inicialização da aplicação (banco + migrações)..."
+  sleep 25
+
+  # Verifica se a migração falhou por erro de autenticação
+  LOGS_APP=$($COMPOSE_CMD logs --tail=60 app 2>/dev/null || true)
+  if echo "$LOGS_APP" | grep -q "password authentication failed"; then
+    echo ""
+    echo -e "${RED}${BOLD}"
+    echo "  ╔══════════════════════════════════════════════════════╗"
+    echo "  ║   ERRO: Falha de autenticação no banco de dados      ║"
+    echo "  ╠══════════════════════════════════════════════════════╣"
+    echo "  ║  O volume do banco foi criado com credenciais        ║"
+    echo "  ║  diferentes das que estão no arquivo .env atual.     ║"
+    echo "  ╚══════════════════════════════════════════════════════╝"
+    echo -e "${NC}"
+    echo ""
+    echo -e "  ${YELLOW}Como resolver:${NC}"
+    echo ""
+    echo -e "  ${GREEN}Opção A — Corrigir o .env:${NC}"
+    echo -e "    Ajuste DB_USER, DB_PASSWORD, DB_NAME no arquivo:"
+    echo -e "    ${CYAN}${APP_DIR}/.env${NC}"
+    echo -e "    para as mesmas credenciais usadas na instalação anterior."
+    echo -e "    Depois execute: ${GREEN}sudo bash ${APP_DIR}/deploy.sh${NC}"
+    echo ""
+    echo -e "  ${RED}Opção B — Reinstalar do zero (apaga todos os dados):${NC}"
+    echo -e "    cd ${APP_DIR}"
+    echo -e "    ${COMPOSE_CMD} down --volumes"
+    echo -e "    sudo bash deploy.sh"
+    echo ""
+    $COMPOSE_CMD logs --tail=30 app
+    exit 1
+  fi
 
   APP_PORT_ENV=$(grep "^APP_PORT" .env 2>/dev/null | cut -d= -f2 | tr -d ' ')
   APP_PORT="${APP_PORT_ENV:-5000}"
