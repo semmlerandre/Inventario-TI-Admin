@@ -1,29 +1,10 @@
-// @ts-ignore — xlsx-js-style has no TS declarations
-import XLSXStyle from "xlsx-js-style";
 import { queryClient } from "@/lib/queryClient";
-
-// ── Local cell-style type ─────────────────────────────────────────────────────
-interface CellStyle {
-  fill?: { patternType?: string; fgColor?: { rgb: string }; bgColor?: { rgb: string } };
-  font?: { bold?: boolean; sz?: number; color?: { rgb: string }; name?: string };
-  alignment?: { horizontal?: string; vertical?: string; wrapText?: boolean };
-  border?: {
-    top?:    { style: string; color?: { rgb: string } };
-    bottom?: { style: string; color?: { rgb: string } };
-    left?:   { style: string; color?: { rgb: string } };
-    right?:  { style: string; color?: { rgb: string } };
-  };
-}
 
 // ── Color utilities ───────────────────────────────────────────────────────────
 
 function hexToRgb(hex: string): [number, number, number] {
   const h = hex.replace(/^#/, "").padEnd(6, "0");
-  return [
-    parseInt(h.substring(0, 2), 16),
-    parseInt(h.substring(2, 4), 16),
-    parseInt(h.substring(4, 6), 16),
-  ];
+  return [parseInt(h.substring(0, 2), 16), parseInt(h.substring(2, 4), 16), parseInt(h.substring(4, 6), 16)];
 }
 
 function rgbToHsl(r: number, g: number, b: number): [number, number, number] {
@@ -49,31 +30,24 @@ function hslToHex(h: number, s: number, l: number): string {
   const a = sn * Math.min(ln, 1 - ln);
   const f = (n: number) => {
     const k = (n + h / 30) % 12;
-    const color = ln - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
-    return Math.round(255 * color).toString(16).padStart(2, "0");
+    return Math.round(255 * (ln - a * Math.max(Math.min(k - 3, 9 - k, 1), -1)))
+      .toString(16).padStart(2, "0");
   };
   return `${f(0)}${f(8)}${f(4)}`.toUpperCase();
 }
 
-/** Derive 6-char hex variants from a primary hex color */
 function buildPalette(primaryHex: string) {
-  const safe = /^#?[0-9A-Fa-f]{6}$/.test(primaryHex)
-    ? primaryHex
-    : "#0ea5e9";
-
+  const safe = /^#?[0-9A-Fa-f]{6}$/.test(primaryHex) ? primaryHex : "#0ea5e9";
   const [r, g, b] = hexToRgb(safe);
-  const [h, s]    = rgbToHsl(r, g, b);
-
-  // Clamp saturation so very desaturated colors still look good
+  const [h, s] = rgbToHsl(r, g, b);
   const si = Math.max(s, 40);
-
   return {
-    headerBg:    hslToHex(h, si,  22), // very dark  — row 1 system name
-    subHeaderBg: hslToHex(h, si,  35), // dark       — row 2 report title
-    dateBg:      hslToHex(h, 60,  94), // very light — row 3 date
-    colHeaderBg: hslToHex(h, si,  48), // primary    — column headers
-    rowAlt:      hslToHex(h, 40,  97), // near-white — alternating rows
-    accent:      hslToHex(h, si,  60), // for borders
+    headerBg:    hslToHex(h, si, 22),
+    subHeaderBg: hslToHex(h, si, 35),
+    dateBg:      hslToHex(h, 60, 94),
+    colHeaderBg: hslToHex(h, si, 48),
+    rowAlt:      hslToHex(h, 40, 97),
+    accent:      hslToHex(h, si, 60),
     white:       "FFFFFF",
     dark:        "1E293B",
     mid:         "475569",
@@ -81,13 +55,13 @@ function buildPalette(primaryHex: string) {
   };
 }
 
-// ── Branding resolver ─────────────────────────────────────────────────────────
+// ── Branding ──────────────────────────────────────────────────────────────────
 
 interface Branding {
-  appName:      string;
+  appName: string;
   primaryColor: string;
-  logoData?:    string | null;
-  logoUrl?:     string | null;
+  logoData?: string | null;
+  logoUrl?: string | null;
 }
 
 function getBranding(): Branding {
@@ -104,126 +78,199 @@ function getLogoSrc(b: Branding): string | null {
   return b.logoData || b.logoUrl || null;
 }
 
-// ── Styled worksheet builder ──────────────────────────────────────────────────
+/** Resolve logo to { base64, ext } — handles data URIs and remote URLs */
+async function resolveLogo(b: Branding): Promise<{ base64: string; ext: string } | null> {
+  const src = b.logoData || b.logoUrl;
+  if (!src) return null;
 
-function solidFill(rgb: string): CellStyle["fill"] {
-  return { patternType: "solid", fgColor: { rgb }, bgColor: { rgb } };
+  // Data URI  →  extract base64 directly
+  if (src.startsWith("data:")) {
+    const m = src.match(/^data:image\/(png|jpeg|jpg|gif|webp|svg\+xml);base64,(.+)$/i);
+    if (!m) return null;
+    const ext = m[1].toLowerCase().replace("svg+xml", "png").replace("jpg", "jpeg");
+    return { base64: m[2], ext };
+  }
+
+  // Remote URL  →  fetch → convert to base64
+  try {
+    const res = await fetch(src);
+    if (!res.ok) return null;
+    const ct = res.headers.get("content-type") || "image/png";
+    const ext = ct.includes("jpeg") || ct.includes("jpg") ? "jpeg" : "png";
+    const buf = await res.arrayBuffer();
+    const bytes = new Uint8Array(buf);
+    let bin = "";
+    bytes.forEach((byte) => (bin += String.fromCharCode(byte)));
+    return { base64: btoa(bin), ext };
+  } catch {
+    return null;
+  }
 }
 
-function buildStyledSheet(
+// ── ExcelJS XLSX builder ──────────────────────────────────────────────────────
+
+function dlBuffer(buffer: ArrayBuffer | Buffer, filename: string) {
+  const blob = new Blob([buffer], {
+    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  });
+  const url = URL.createObjectURL(blob);
+  const a   = document.createElement("a");
+  a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+}
+
+async function buildWorkbook(
   b: Branding,
   reportTitle: string,
-  headers: string[],
-  rows: (string | number)[][]
-): object {
-  const C = buildPalette(b.primaryColor);
-  const dateStr   = new Date().toLocaleString("pt-BR");
-  const colCount  = headers.length;
+  sheets: Array<{ name: string; headers: string[]; rows: (string | number)[][] }>
+): Promise<ArrayBuffer> {
+  // Alias in vite.config.ts maps "exceljs" → exceljs.min.js (browser-compatible bundle)
+  const ExcelJS = (await import("exceljs")).default;
+  const wb  = new ExcelJS.Workbook();
+  wb.creator  = b.appName;
+  wb.created  = new Date();
 
-  // ── Style factories ──
-  const sysNameStyle: CellStyle = {
-    fill:      solidFill(C.headerBg),
-    font:      { bold: true, sz: 14, color: { rgb: C.white }, name: "Calibri" },
-    alignment: { horizontal: "left", vertical: "center" },
-  };
-  const subHeaderStyle: CellStyle = {
-    fill:      solidFill(C.subHeaderBg),
-    font:      { bold: false, sz: 11, color: { rgb: C.white }, name: "Calibri" },
-    alignment: { horizontal: "left", vertical: "center" },
-  };
-  const dateStyle: CellStyle = {
-    fill:      solidFill(C.dateBg),
-    font:      { bold: false, sz: 10, color: { rgb: C.mid }, name: "Calibri" },
-    alignment: { horizontal: "left", vertical: "center" },
-  };
-  const spacerStyle: CellStyle = { fill: solidFill(C.dateBg) };
-  const colHeaderStyle: CellStyle = {
-    fill:      solidFill(C.colHeaderBg),
-    font:      { bold: true, sz: 10, color: { rgb: C.white }, name: "Calibri" },
-    alignment: { horizontal: "center", vertical: "center" },
-    border: {
-      top:    { style: "thin",  color: { rgb: C.accent } },
-      bottom: { style: "thin",  color: { rgb: C.accent } },
-      left:   { style: "thin",  color: { rgb: C.accent } },
-      right:  { style: "thin",  color: { rgb: C.accent } },
-    },
-  };
+  const C       = buildPalette(b.primaryColor);
+  const dateStr = new Date().toLocaleString("pt-BR");
+  const argb    = (hex: string) => `FF${hex.toUpperCase()}`;
 
-  const dataStyle = (ri: number, isNum = false): CellStyle => ({
-    fill:      solidFill(ri % 2 === 0 ? C.white : C.rowAlt),
-    font:      { sz: 10, color: { rgb: C.dark }, name: "Calibri" },
-    alignment: { horizontal: isNum ? "center" : "left", vertical: "center" },
-    border: {
-      top:    { style: "hair", color: { rgb: C.border } },
-      bottom: { style: "hair", color: { rgb: C.border } },
-      left:   { style: "hair", color: { rgb: C.border } },
-      right:  { style: "hair", color: { rgb: C.border } },
-    },
-  });
+  // Resolve logo once for all sheets
+  const logo = await resolveLogo(b);
 
-  const cell = (v: string | number | null, style: CellStyle) => ({
-    v: v ?? "", t: "s", s: style,
-  });
-  const numCell = (v: string | number, style: CellStyle) => ({
-    v: typeof v === "number" ? v : String(v),
-    t: typeof v === "number" ? "n" : "s",
-    s: style,
-  });
+  for (const { name, headers, rows } of sheets) {
+    const ws       = wb.addWorksheet(name.substring(0, 31));
+    const colCount = headers.length;
 
-  const blank = (style: CellStyle) => cell("", style);
-  const blankRow = (style: CellStyle) => Array(colCount).fill(blank(style));
+    // ── Auto column widths ──
+    ws.columns = headers.map((h, ci) => {
+      const maxData = Math.max(h.length, ...rows.map((r) => String(r[ci] ?? "").length));
+      return { width: Math.min(maxData + 4, 55) };
+    });
 
-  // ── Build rows ──
-  const row0 = [cell(b.appName, sysNameStyle),   ...blankRow(sysNameStyle).slice(1)];
-  const row1 = [cell(reportTitle, subHeaderStyle),...blankRow(subHeaderStyle).slice(1)];
-  const row2 = [cell(`Gerado em: ${dateStr}`, dateStyle), ...blankRow(dateStyle).slice(1)];
-  const row3 = blankRow(spacerStyle);
-  const row4 = headers.map((h) => cell(h, colHeaderStyle));
-  const dataRows = rows.map((row, ri) =>
-    row.map((v, ci) => numCell(v, dataStyle(ri, typeof v === "number")))
-  );
+    // ── Add logo image ──
+    let logoColOffset = 1; // data starts at col index 1 (A) by default
+    if (logo) {
+      try {
+        const imgId = wb.addImage({
+          base64:    logo.base64,
+          extension: logo.ext as any,
+        });
+        // Occupy column A, rows 1-3 (tl inclusive, br exclusive in ExcelJS nativeSize=false)
+        ws.addImage(imgId, {
+          tl: { col: 0.08, row: 0.1 } as any,
+          br: { col: 1,    row: 3   } as any,
+          editAs: "oneCell",
+        });
+        logoColOffset = 1; // logo is in col 0 (A); text starts from col 1 (B)
 
-  const aoa = [row0, row1, row2, row3, row4, ...dataRows];
-  const ws  = XLSXStyle.utils.aoa_to_sheet(aoa);
+        // Fill col A rows 1-4 with matching bg so there's no white gap
+        const rowBgs = [C.headerBg, C.subHeaderBg, C.subHeaderBg, C.dateBg];
+        rowBgs.forEach((bg, ri) => {
+          const cell = ws.getCell(ri + 1, 1);
+          cell.fill  = { type: "pattern", pattern: "solid", fgColor: { argb: argb(bg) } };
+        });
+      } catch {
+        logoColOffset = 0; // logo failed — use full width
+      }
+    } else {
+      logoColOffset = 0;
+    }
 
-  // Merge branding rows
-  ws["!merges"] = [
-    { s: { r: 0, c: 0 }, e: { r: 0, c: colCount - 1 } },
-    { s: { r: 1, c: 0 }, e: { r: 1, c: colCount - 1 } },
-    { s: { r: 2, c: 0 }, e: { r: 2, c: colCount - 1 } },
-    { s: { r: 3, c: 0 }, e: { r: 3, c: colCount - 1 } },
-  ];
+    const textStartCol = logoColOffset + 1; // 1-based ExcelJS column index
 
-  // Auto column widths
-  const maxW: number[] = headers.map((h) => h.length + 2);
-  rows.forEach((row) =>
-    row.forEach((v, ci) => {
-      const len = String(v ?? "").length;
-      if (len > (maxW[ci] ?? 0)) maxW[ci] = len;
-    })
-  );
-  ws["!cols"] = maxW.map((w) => ({ wch: Math.min(w + 2, 55) }));
-  ws["!rows"] = [
-    { hpx: 28 }, { hpx: 20 }, { hpx: 16 }, { hpx: 6 }, { hpx: 20 },
-  ];
+    // ── Row 1 — System name ──
+    ws.getRow(1).height = 46;
+    if (textStartCol <= colCount) {
+      ws.mergeCells(1, textStartCol, 1, colCount);
+    }
+    const sysCell = ws.getCell(1, textStartCol);
+    sysCell.value = b.appName;
+    sysCell.fill  = { type: "pattern", pattern: "solid", fgColor: { argb: argb(C.headerBg) } };
+    sysCell.font  = { bold: true, size: 16, color: { argb: "FFFFFFFF" }, name: "Calibri" };
+    sysCell.alignment = { vertical: "middle", horizontal: "left", indent: 1 };
 
-  return ws;
+    // ── Row 2 — Report title ──
+    ws.getRow(2).height = 22;
+    if (textStartCol <= colCount) {
+      ws.mergeCells(2, textStartCol, 2, colCount);
+    }
+    const titleCell = ws.getCell(2, textStartCol);
+    titleCell.value = reportTitle;
+    titleCell.fill  = { type: "pattern", pattern: "solid", fgColor: { argb: argb(C.subHeaderBg) } };
+    titleCell.font  = { size: 11, color: { argb: "FFFFFFFF" }, name: "Calibri" };
+    titleCell.alignment = { vertical: "middle", horizontal: "left", indent: 1 };
+
+    // ── Row 3 — Date ──
+    ws.getRow(3).height = 18;
+    if (textStartCol <= colCount) {
+      ws.mergeCells(3, textStartCol, 3, colCount);
+    }
+    const dateCell = ws.getCell(3, textStartCol);
+    dateCell.value = `Gerado em: ${dateStr}`;
+    dateCell.fill  = { type: "pattern", pattern: "solid", fgColor: { argb: argb(C.dateBg) } };
+    dateCell.font  = { size: 10, color: { argb: argb(C.mid) }, name: "Calibri" };
+    dateCell.alignment = { vertical: "middle", horizontal: "left", indent: 1 };
+
+    // ── Row 4 — Spacer ──
+    ws.getRow(4).height = 6;
+    ws.mergeCells(4, 1, 4, colCount);
+    ws.getCell(4, 1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: argb(C.dateBg) } };
+
+    // ── Row 5 — Column headers ──
+    ws.getRow(5).height = 22;
+    headers.forEach((h, ci) => {
+      const cell = ws.getCell(5, ci + 1);
+      cell.value = h;
+      cell.fill  = { type: "pattern", pattern: "solid", fgColor: { argb: argb(C.colHeaderBg) } };
+      cell.font  = { bold: true, size: 10, color: { argb: "FFFFFFFF" }, name: "Calibri" };
+      cell.alignment = { vertical: "middle", horizontal: "center" };
+      cell.border = {
+        top:    { style: "thin", color: { argb: argb(C.accent) } },
+        bottom: { style: "thin", color: { argb: argb(C.accent) } },
+        left:   { style: "hair", color: { argb: argb(C.accent) } },
+        right:  { style: "hair", color: { argb: argb(C.accent) } },
+      };
+    });
+
+    // ── Data rows ──
+    rows.forEach((row, ri) => {
+      const rowNum = ri + 6;
+      const bg     = ri % 2 === 0 ? C.white : C.rowAlt;
+      ws.getRow(rowNum).height = 16;
+      row.forEach((v, ci) => {
+        const cell = ws.getCell(rowNum, ci + 1);
+        cell.value = v;
+        cell.fill  = { type: "pattern", pattern: "solid", fgColor: { argb: argb(bg) } };
+        cell.font  = { size: 10, color: { argb: argb(C.dark) }, name: "Calibri" };
+        cell.alignment = {
+          vertical:   "middle",
+          horizontal: typeof v === "number" ? "center" : "left",
+        };
+        cell.border = {
+          top:    { style: "hair", color: { argb: argb(C.border) } },
+          bottom: { style: "hair", color: { argb: argb(C.border) } },
+          left:   { style: "hair", color: { argb: argb(C.border) } },
+          right:  { style: "hair", color: { argb: argb(C.border) } },
+        };
+      });
+    });
+  }
+
+  return wb.xlsx.writeBuffer() as Promise<ArrayBuffer>;
 }
 
 // ── Public API ────────────────────────────────────────────────────────────────
 
-export function downloadBrandedXLSX(
+export async function downloadBrandedXLSX(
   reportTitle: string,
   headers: string[],
   rows: (string | number)[][],
   filename: string,
   sheetName = "Relatório"
 ) {
-  const b  = getBranding();
-  const ws = buildStyledSheet(b, reportTitle, headers, rows);
-  const wb = XLSXStyle.utils.book_new();
-  XLSXStyle.utils.book_append_sheet(wb, ws, sheetName.substring(0, 31));
-  XLSXStyle.writeFile(wb, filename);
+  const b      = getBranding();
+  const buffer = await buildWorkbook(b, reportTitle, [{ name: sheetName, headers, rows }]);
+  dlBuffer(buffer, filename);
 }
 
 export interface XLSXSheet {
@@ -232,19 +279,17 @@ export interface XLSXSheet {
   rows: (string | number)[][];
 }
 
-export function downloadBrandedXLSXMulti(
+export async function downloadBrandedXLSXMulti(
   reportTitle: string,
   sheets: XLSXSheet[],
   filename: string
 ) {
-  const b  = getBranding();
-  const wb = XLSXStyle.utils.book_new();
-  sheets.forEach(({ name, headers, rows }) => {
-    const ws = buildStyledSheet(b, reportTitle, headers, rows);
-    XLSXStyle.utils.book_append_sheet(wb, ws, name.substring(0, 31));
-  });
-  XLSXStyle.writeFile(wb, filename);
+  const b      = getBranding();
+  const buffer = await buildWorkbook(b, reportTitle, sheets);
+  dlBuffer(buffer, filename);
 }
+
+// ── CSV (no async needed) ─────────────────────────────────────────────────────
 
 export function downloadBrandedCSV(
   reportTitle: string,
@@ -254,8 +299,7 @@ export function downloadBrandedCSV(
 ) {
   const { appName } = getBranding();
   const dateStr = new Date().toLocaleString("pt-BR");
-  const esc = (v: string | number) =>
-    `"${String(v ?? "").replace(/"/g, '""')}"`;
+  const esc = (v: string | number) => `"${String(v ?? "").replace(/"/g, '""')}"`;
 
   const lines = [
     esc(appName),
@@ -272,9 +316,11 @@ export function downloadBrandedCSV(
   URL.revokeObjectURL(url);
 }
 
+// ── PDF print ─────────────────────────────────────────────────────────────────
+
 export function printWithBranding(reportTitle: string) {
-  const b      = getBranding();
-  const C      = buildPalette(b.primaryColor);
+  const b       = getBranding();
+  const C       = buildPalette(b.primaryColor);
   const logoSrc = getLogoSrc(b);
   const dateStr = new Date().toLocaleString("pt-BR");
 
@@ -286,12 +332,12 @@ export function printWithBranding(reportTitle: string) {
 
   const logoHtml = logoSrc
     ? `<img src="${logoSrc}" alt="logo"
-         style="height:44px;width:44px;object-fit:contain;border-radius:8px;
-                border:2px solid rgba(255,255,255,0.3);" />`
+           style="height:44px;width:44px;object-fit:contain;border-radius:8px;
+                  border:2px solid rgba(255,255,255,0.3);" />`
     : `<div style="height:44px;width:44px;border-radius:8px;
-                  background:rgba(255,255,255,0.15);border:2px solid rgba(255,255,255,0.3);
-                  display:flex;align-items:center;justify-content:center;
-                  font-size:16px;font-weight:800;color:#fff;">
+                   background:rgba(255,255,255,0.15);border:2px solid rgba(255,255,255,0.3);
+                   display:flex;align-items:center;justify-content:center;
+                   font-size:16px;font-weight:800;color:#fff;">
          ${b.appName.substring(0, 2).toUpperCase()}
        </div>`;
 
@@ -299,27 +345,19 @@ export function printWithBranding(reportTitle: string) {
   header.id = headerId;
   header.innerHTML = `
     <div style="
-      display:flex;align-items:center;gap:14px;
-      padding:14px 20px 12px;margin-bottom:20px;
+      display:flex;align-items:center;gap:14px;padding:14px 20px 12px;
+      margin-bottom:20px;border-radius:10px;
       background:linear-gradient(135deg,#${C.headerBg} 0%,#${C.subHeaderBg} 100%);
-      border-radius:10px;box-shadow:0 2px 10px rgba(0,0,0,0.2);
+      box-shadow:0 2px 10px rgba(0,0,0,0.2);
     ">
       ${logoHtml}
       <div style="flex:1;">
-        <div style="font-size:17px;font-weight:800;color:#fff;letter-spacing:-.3px;">
-          ${b.appName}
-        </div>
-        <div style="font-size:11px;color:rgba(255,255,255,0.75);margin-top:2px;">
-          ${reportTitle}
-        </div>
+        <div style="font-size:17px;font-weight:800;color:#fff;letter-spacing:-.3px;">${b.appName}</div>
+        <div style="font-size:11px;color:rgba(255,255,255,0.75);margin-top:2px;">${reportTitle}</div>
       </div>
       <div style="text-align:right;">
-        <div style="font-size:9px;color:rgba(255,255,255,0.55);text-transform:uppercase;letter-spacing:.5px;">
-          Emitido em
-        </div>
-        <div style="font-size:11px;font-weight:600;color:rgba(255,255,255,0.9);margin-top:2px;">
-          ${dateStr}
-        </div>
+        <div style="font-size:9px;color:rgba(255,255,255,0.55);text-transform:uppercase;letter-spacing:.5px;">Emitido em</div>
+        <div style="font-size:11px;font-weight:600;color:rgba(255,255,255,0.9);margin-top:2px;">${dateStr}</div>
       </div>
     </div>
   `;
