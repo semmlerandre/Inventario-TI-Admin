@@ -12,7 +12,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Pencil, Trash2, Phone, Search, User, Cpu, Smartphone } from "lucide-react";
+import { Plus, Pencil, Trash2, Phone, Search, User, Cpu, Smartphone, FileText, Sheet, Printer } from "lucide-react";
+import { downloadBrandedCSV, downloadBrandedXLSX, printWithBranding } from "@/lib/export-utils";
 
 const LINE_STATUS: Record<string, { label: string; variant: any; color: string }> = {
   active: { label: "Ativa", variant: "default", color: "bg-green-100 text-green-700" },
@@ -129,7 +130,12 @@ export default function LinhasPage() {
             <h1 className="text-2xl font-bold text-slate-900">Linhas Telefônicas</h1>
             <p className="text-slate-500 text-sm mt-1">Gerencie todas as linhas corporativas</p>
           </div>
-          <Button onClick={openCreate} data-testid="button-new-line"><Plus className="h-4 w-4 mr-2" /> Nova Linha</Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => downloadBrandedCSV("Linhas Telefônicas", ["Número","Operadora","Plano","Responsável","Departamento","Status","Chamado"], filtered.map(l => [l.number, l.carrier?.name||"", l.plan?.name||"", l.responsibleName||"", l.responsibleDepartment||"", LINE_STATUS[l.status]?.label||l.status, l.ticketNumber||""]), "linhas.csv")} data-testid="button-export-csv"><FileText className="h-4 w-4 mr-1" />CSV</Button>
+            <Button variant="outline" size="sm" onClick={() => downloadBrandedXLSX("Linhas Telefônicas", ["Número","Operadora","Plano","Responsável","Departamento","Status","Chamado"], filtered.map(l => [l.number, l.carrier?.name||"", l.plan?.name||"", l.responsibleName||"", l.responsibleDepartment||"", LINE_STATUS[l.status]?.label||l.status, l.ticketNumber||""]), "linhas.xlsx", "Linhas")} data-testid="button-export-xls"><Sheet className="h-4 w-4 mr-1" />XLS</Button>
+            <Button variant="outline" size="sm" onClick={() => printWithBranding("Linhas Telefônicas")} data-testid="button-export-pdf"><Printer className="h-4 w-4 mr-1" />PDF</Button>
+            <Button onClick={openCreate} data-testid="button-new-line"><Plus className="h-4 w-4 mr-2" /> Nova Linha</Button>
+          </div>
         </div>
 
         <div className="grid grid-cols-4 gap-4">

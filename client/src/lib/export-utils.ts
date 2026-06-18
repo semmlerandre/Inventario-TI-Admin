@@ -1,6 +1,7 @@
 import { queryClient } from "@/lib/queryClient";
+import * as XLSX from "xlsx-js-style";
 
-// ── Color utilities ───────────────────────────────────────────────────────────
+// ── Color utilities ────────────────────────────────────────────────────────────
 
 function hexToRgb(hex: string): [number, number, number] {
   const h = hex.replace(/^#/, "").padEnd(6, "0");
@@ -78,38 +79,139 @@ function getLogoSrc(b: Branding): string | null {
   return b.logoData || b.logoUrl || null;
 }
 
-/** Resolve logo to { base64, ext } — handles data URIs and remote URLs */
-async function resolveLogo(b: Branding): Promise<{ base64: string; ext: string } | null> {
-  const src = b.logoData || b.logoUrl;
-  if (!src) return null;
+// ── xlsx-js-style XLSX builder ─────────────────────────────────────────────────
 
-  // Data URI  →  extract base64 directly
-  if (src.startsWith("data:")) {
-    const m = src.match(/^data:image\/(png|jpeg|jpg|gif|webp|svg\+xml);base64,(.+)$/i);
-    if (!m) return null;
-    const ext = m[1].toLowerCase().replace("svg+xml", "png").replace("jpg", "jpeg");
-    return { base64: m[2], ext };
+function buildXLSXBuffer(
+  b: Branding,
+  reportTitle: string,
+  sheets: Array<{ name: string; headers: string[]; rows: (string | number)[][] }>
+): ArrayBuffer {
+  const C = buildPalette(b.primaryColor);
+  const dateStr = new Date().toLocaleString("pt-BR");
+
+  const wb = XLSX.utils.book_new();
+
+  for (const { name, headers, rows } of sheets) {
+    const colCount = headers.length;
+
+    // Build AoA: header rows + col headers + data
+    const aoa: (string | number)[][] = [
+      [b.appName, ...Array(colCount - 1).fill("")],
+      [reportTitle, ...Array(colCount - 1).fill("")],
+      [`Gerado em: ${dateStr}`, ...Array(colCount - 1).fill("")],
+      Array(colCount).fill(""),   // spacer
+      headers,
+      ...rows,
+    ];
+
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+
+    // Helper: cell address from row/col (0-based)
+    const addr = (r: number, c: number) => XLSX.utils.encode_cell({ r, c });
+
+    // Merge header/title/date rows across all columns
+    const merges: XLSX.Range[] = [];
+    if (colCount > 1) {
+      merges.push({ s: { r: 0, c: 0 }, e: { r: 0, c: colCount - 1 } });
+      merges.push({ s: { r: 1, c: 0 }, e: { r: 1, c: colCount - 1 } });
+      merges.push({ s: { r: 2, c: 0 }, e: { r: 2, c: colCount - 1 } });
+      merges.push({ s: { r: 3, c: 0 }, e: { r: 3, c: colCount - 1 } });
+    }
+    ws["!merges"] = merges;
+
+    // Row 0 — System name
+    const sysCell = ws[addr(0, 0)] || {};
+    sysCell.s = {
+      fill: { patternType: "solid", fgColor: { rgb: C.headerBg } },
+      font: { bold: true, sz: 16, color: { rgb: "FFFFFF" }, name: "Calibri" },
+      alignment: { vertical: "center", horizontal: "left", indent: 1 },
+    };
+    ws[addr(0, 0)] = sysCell;
+
+    // Row 1 — Report title
+    const titleCell = ws[addr(1, 0)] || {};
+    titleCell.s = {
+      fill: { patternType: "solid", fgColor: { rgb: C.subHeaderBg } },
+      font: { sz: 12, color: { rgb: "FFFFFF" }, name: "Calibri" },
+      alignment: { vertical: "center", horizontal: "left", indent: 1 },
+    };
+    ws[addr(1, 0)] = titleCell;
+
+    // Row 2 — Date
+    const dateCell = ws[addr(2, 0)] || {};
+    dateCell.s = {
+      fill: { patternType: "solid", fgColor: { rgb: C.dateBg } },
+      font: { sz: 10, color: { rgb: C.mid }, name: "Calibri" },
+      alignment: { vertical: "center", horizontal: "left", indent: 1 },
+    };
+    ws[addr(2, 0)] = dateCell;
+
+    // Row 3 — Spacer
+    const spacerCell = ws[addr(3, 0)] || { v: "" };
+    spacerCell.s = { fill: { patternType: "solid", fgColor: { rgb: C.dateBg } } };
+    ws[addr(3, 0)] = spacerCell;
+
+    // Row 4 — Column headers
+    headers.forEach((_, ci) => {
+      const cell = ws[addr(4, ci)] || {};
+      cell.s = {
+        fill: { patternType: "solid", fgColor: { rgb: C.colHeaderBg } },
+        font: { bold: true, sz: 10, color: { rgb: "FFFFFF" }, name: "Calibri" },
+        alignment: { vertical: "center", horizontal: "center" },
+        border: {
+          top:    { style: "thin",  color: { rgb: C.accent } },
+          bottom: { style: "thin",  color: { rgb: C.accent } },
+          left:   { style: "hair",  color: { rgb: C.accent } },
+          right:  { style: "hair",  color: { rgb: C.accent } },
+        },
+      };
+      ws[addr(4, ci)] = cell;
+    });
+
+    // Data rows
+    rows.forEach((row, ri) => {
+      const bg = ri % 2 === 0 ? C.white : C.rowAlt;
+      row.forEach((v, ci) => {
+        const cell = ws[addr(ri + 5, ci)] || {};
+        cell.s = {
+          fill: { patternType: "solid", fgColor: { rgb: bg } },
+          font: { sz: 10, color: { rgb: C.dark }, name: "Calibri" },
+          alignment: { vertical: "center", horizontal: typeof v === "number" ? "center" : "left" },
+          border: {
+            top:    { style: "hair", color: { rgb: C.border } },
+            bottom: { style: "hair", color: { rgb: C.border } },
+            left:   { style: "hair", color: { rgb: C.border } },
+            right:  { style: "hair", color: { rgb: C.border } },
+          },
+        };
+        ws[addr(ri + 5, ci)] = cell;
+      });
+    });
+
+    // Auto column widths
+    ws["!cols"] = headers.map((h, ci) => {
+      const maxData = Math.max(h.length, ...rows.map((r) => String(r[ci] ?? "").length));
+      return { wch: Math.min(maxData + 4, 55) };
+    });
+
+    // Row heights
+    ws["!rows"] = [
+      { hpx: 40 },   // system name
+      { hpx: 22 },   // report title
+      { hpx: 18 },   // date
+      { hpx: 6  },   // spacer
+      { hpx: 22 },   // col headers
+      ...rows.map(() => ({ hpx: 16 })),
+    ];
+
+    XLSX.utils.book_append_sheet(wb, ws, name.substring(0, 31));
   }
 
-  // Remote URL  →  fetch → convert to base64
-  try {
-    const res = await fetch(src);
-    if (!res.ok) return null;
-    const ct = res.headers.get("content-type") || "image/png";
-    const ext = ct.includes("jpeg") || ct.includes("jpg") ? "jpeg" : "png";
-    const buf = await res.arrayBuffer();
-    const bytes = new Uint8Array(buf);
-    let bin = "";
-    bytes.forEach((byte) => (bin += String.fromCharCode(byte)));
-    return { base64: btoa(bin), ext };
-  } catch {
-    return null;
-  }
+  const out = XLSX.write(wb, { bookType: "xlsx", type: "array", cellStyles: true });
+  return out as ArrayBuffer;
 }
 
-// ── ExcelJS XLSX builder ──────────────────────────────────────────────────────
-
-function dlBuffer(buffer: ArrayBuffer | Buffer, filename: string) {
+function dlBuffer(buffer: ArrayBuffer, filename: string) {
   const blob = new Blob([buffer], {
     type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   });
@@ -119,149 +221,9 @@ function dlBuffer(buffer: ArrayBuffer | Buffer, filename: string) {
   URL.revokeObjectURL(url);
 }
 
-async function buildWorkbook(
-  b: Branding,
-  reportTitle: string,
-  sheets: Array<{ name: string; headers: string[]; rows: (string | number)[][] }>
-): Promise<ArrayBuffer> {
-  // Alias in vite.config.ts maps "exceljs" → exceljs.min.js (browser-compatible bundle)
-  const ExcelJS = (await import("exceljs")).default;
-  const wb  = new ExcelJS.Workbook();
-  wb.creator  = b.appName;
-  wb.created  = new Date();
-
-  const C       = buildPalette(b.primaryColor);
-  const dateStr = new Date().toLocaleString("pt-BR");
-  const argb    = (hex: string) => `FF${hex.toUpperCase()}`;
-
-  // Resolve logo once for all sheets
-  const logo = await resolveLogo(b);
-
-  for (const { name, headers, rows } of sheets) {
-    const ws       = wb.addWorksheet(name.substring(0, 31));
-    const colCount = headers.length;
-
-    // ── Auto column widths ──
-    ws.columns = headers.map((h, ci) => {
-      const maxData = Math.max(h.length, ...rows.map((r) => String(r[ci] ?? "").length));
-      return { width: Math.min(maxData + 4, 55) };
-    });
-
-    // ── Add logo image ──
-    let logoColOffset = 1; // data starts at col index 1 (A) by default
-    if (logo) {
-      try {
-        const imgId = wb.addImage({
-          base64:    logo.base64,
-          extension: logo.ext as any,
-        });
-        // Occupy column A, rows 1-3 (tl inclusive, br exclusive in ExcelJS nativeSize=false)
-        ws.addImage(imgId, {
-          tl: { col: 0.08, row: 0.1 } as any,
-          br: { col: 1,    row: 3   } as any,
-          editAs: "oneCell",
-        });
-        logoColOffset = 1; // logo is in col 0 (A); text starts from col 1 (B)
-
-        // Fill col A rows 1-4 with matching bg so there's no white gap
-        const rowBgs = [C.headerBg, C.subHeaderBg, C.subHeaderBg, C.dateBg];
-        rowBgs.forEach((bg, ri) => {
-          const cell = ws.getCell(ri + 1, 1);
-          cell.fill  = { type: "pattern", pattern: "solid", fgColor: { argb: argb(bg) } };
-        });
-      } catch {
-        logoColOffset = 0; // logo failed — use full width
-      }
-    } else {
-      logoColOffset = 0;
-    }
-
-    const textStartCol = logoColOffset + 1; // 1-based ExcelJS column index
-
-    // ── Row 1 — System name ──
-    ws.getRow(1).height = 46;
-    if (textStartCol <= colCount) {
-      ws.mergeCells(1, textStartCol, 1, colCount);
-    }
-    const sysCell = ws.getCell(1, textStartCol);
-    sysCell.value = b.appName;
-    sysCell.fill  = { type: "pattern", pattern: "solid", fgColor: { argb: argb(C.headerBg) } };
-    sysCell.font  = { bold: true, size: 16, color: { argb: "FFFFFFFF" }, name: "Calibri" };
-    sysCell.alignment = { vertical: "middle", horizontal: "left", indent: 1 };
-
-    // ── Row 2 — Report title ──
-    ws.getRow(2).height = 22;
-    if (textStartCol <= colCount) {
-      ws.mergeCells(2, textStartCol, 2, colCount);
-    }
-    const titleCell = ws.getCell(2, textStartCol);
-    titleCell.value = reportTitle;
-    titleCell.fill  = { type: "pattern", pattern: "solid", fgColor: { argb: argb(C.subHeaderBg) } };
-    titleCell.font  = { size: 11, color: { argb: "FFFFFFFF" }, name: "Calibri" };
-    titleCell.alignment = { vertical: "middle", horizontal: "left", indent: 1 };
-
-    // ── Row 3 — Date ──
-    ws.getRow(3).height = 18;
-    if (textStartCol <= colCount) {
-      ws.mergeCells(3, textStartCol, 3, colCount);
-    }
-    const dateCell = ws.getCell(3, textStartCol);
-    dateCell.value = `Gerado em: ${dateStr}`;
-    dateCell.fill  = { type: "pattern", pattern: "solid", fgColor: { argb: argb(C.dateBg) } };
-    dateCell.font  = { size: 10, color: { argb: argb(C.mid) }, name: "Calibri" };
-    dateCell.alignment = { vertical: "middle", horizontal: "left", indent: 1 };
-
-    // ── Row 4 — Spacer ──
-    ws.getRow(4).height = 6;
-    ws.mergeCells(4, 1, 4, colCount);
-    ws.getCell(4, 1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: argb(C.dateBg) } };
-
-    // ── Row 5 — Column headers ──
-    ws.getRow(5).height = 22;
-    headers.forEach((h, ci) => {
-      const cell = ws.getCell(5, ci + 1);
-      cell.value = h;
-      cell.fill  = { type: "pattern", pattern: "solid", fgColor: { argb: argb(C.colHeaderBg) } };
-      cell.font  = { bold: true, size: 10, color: { argb: "FFFFFFFF" }, name: "Calibri" };
-      cell.alignment = { vertical: "middle", horizontal: "center" };
-      cell.border = {
-        top:    { style: "thin", color: { argb: argb(C.accent) } },
-        bottom: { style: "thin", color: { argb: argb(C.accent) } },
-        left:   { style: "hair", color: { argb: argb(C.accent) } },
-        right:  { style: "hair", color: { argb: argb(C.accent) } },
-      };
-    });
-
-    // ── Data rows ──
-    rows.forEach((row, ri) => {
-      const rowNum = ri + 6;
-      const bg     = ri % 2 === 0 ? C.white : C.rowAlt;
-      ws.getRow(rowNum).height = 16;
-      row.forEach((v, ci) => {
-        const cell = ws.getCell(rowNum, ci + 1);
-        cell.value = v;
-        cell.fill  = { type: "pattern", pattern: "solid", fgColor: { argb: argb(bg) } };
-        cell.font  = { size: 10, color: { argb: argb(C.dark) }, name: "Calibri" };
-        cell.alignment = {
-          vertical:   "middle",
-          horizontal: typeof v === "number" ? "center" : "left",
-        };
-        cell.border = {
-          top:    { style: "hair", color: { argb: argb(C.border) } },
-          bottom: { style: "hair", color: { argb: argb(C.border) } },
-          left:   { style: "hair", color: { argb: argb(C.border) } },
-          right:  { style: "hair", color: { argb: argb(C.border) } },
-        };
-      });
-    });
-  }
-
-  return wb.xlsx.writeBuffer() as Promise<ArrayBuffer>;
-}
-
 // ── Public API ────────────────────────────────────────────────────────────────
 
-export async function downloadBrandedXLSX(
+export function downloadBrandedXLSX(
   reportTitle: string,
   headers: string[],
   rows: (string | number)[][],
@@ -269,7 +231,7 @@ export async function downloadBrandedXLSX(
   sheetName = "Relatório"
 ) {
   const b      = getBranding();
-  const buffer = await buildWorkbook(b, reportTitle, [{ name: sheetName, headers, rows }]);
+  const buffer = buildXLSXBuffer(b, reportTitle, [{ name: sheetName, headers, rows }]);
   dlBuffer(buffer, filename);
 }
 
@@ -279,17 +241,17 @@ export interface XLSXSheet {
   rows: (string | number)[][];
 }
 
-export async function downloadBrandedXLSXMulti(
+export function downloadBrandedXLSXMulti(
   reportTitle: string,
   sheets: XLSXSheet[],
   filename: string
 ) {
   const b      = getBranding();
-  const buffer = await buildWorkbook(b, reportTitle, sheets);
+  const buffer = buildXLSXBuffer(b, reportTitle, sheets);
   dlBuffer(buffer, filename);
 }
 
-// ── CSV (no async needed) ─────────────────────────────────────────────────────
+// ── CSV ───────────────────────────────────────────────────────────────────────
 
 export function downloadBrandedCSV(
   reportTitle: string,

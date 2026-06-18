@@ -24,8 +24,6 @@ export default defineConfig({
       "@": path.resolve(import.meta.dirname, "client", "src"),
       "@shared": path.resolve(import.meta.dirname, "shared"),
       "@assets": path.resolve(import.meta.dirname, "attached_assets"),
-      // Use the pre-bundled browser build of ExcelJS to avoid Node.js fs/stream warnings
-      "exceljs": path.resolve(import.meta.dirname, "node_modules/exceljs/dist/exceljs.min.js"),
     },
   },
   root: path.resolve(import.meta.dirname, "client"),
@@ -41,6 +39,5 @@ export default defineConfig({
   },
   optimizeDeps: {
     include: ["xlsx-js-style"],
-    exclude: ["exceljs"],
   },
 });

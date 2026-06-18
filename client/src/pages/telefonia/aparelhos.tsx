@@ -11,7 +11,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Pencil, Trash2, Smartphone, Search } from "lucide-react";
+import { Plus, Pencil, Trash2, Smartphone, Search, FileText, Sheet, Printer } from "lucide-react";
+import { downloadBrandedCSV, downloadBrandedXLSX, printWithBranding } from "@/lib/export-utils";
 import type { MobileDevice } from "@shared/schema";
 
 const STATUS_LABELS: Record<string, { label: string; variant: any }> = {
@@ -98,7 +99,12 @@ export default function AparelhosPage() {
             <h1 className="text-2xl font-bold text-slate-900">Aparelhos</h1>
             <p className="text-slate-500 text-sm mt-1">Inventário de dispositivos móveis</p>
           </div>
-          <Button onClick={openCreate} data-testid="button-new-device"><Plus className="h-4 w-4 mr-2" /> Novo Aparelho</Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => downloadBrandedCSV("Aparelhos Móveis", ["Marca/Modelo","IMEI","Status","Aquisição","Observações"], filtered.map(d => [`${d.brand} ${d.model}`, d.imei||"", STATUS_LABELS[d.status]?.label||d.status, d.acquisitionDate ? new Date(d.acquisitionDate).toLocaleDateString("pt-BR") : "", d.notes||""]), "aparelhos.csv")} data-testid="button-export-csv"><FileText className="h-4 w-4 mr-1" />CSV</Button>
+            <Button variant="outline" size="sm" onClick={() => downloadBrandedXLSX("Aparelhos Móveis", ["Marca/Modelo","IMEI","Status","Aquisição","Observações"], filtered.map(d => [`${d.brand} ${d.model}`, d.imei||"", STATUS_LABELS[d.status]?.label||d.status, d.acquisitionDate ? new Date(d.acquisitionDate).toLocaleDateString("pt-BR") : "", d.notes||""]), "aparelhos.xlsx", "Aparelhos")} data-testid="button-export-xls"><Sheet className="h-4 w-4 mr-1" />XLS</Button>
+            <Button variant="outline" size="sm" onClick={() => printWithBranding("Aparelhos Móveis")} data-testid="button-export-pdf"><Printer className="h-4 w-4 mr-1" />PDF</Button>
+            <Button onClick={openCreate} data-testid="button-new-device"><Plus className="h-4 w-4 mr-2" /> Novo Aparelho</Button>
+          </div>
         </div>
 
         <div className="grid grid-cols-4 gap-4">

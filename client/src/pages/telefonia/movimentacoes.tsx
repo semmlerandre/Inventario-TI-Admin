@@ -11,7 +11,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, ArrowLeftRight, Search, Clock } from "lucide-react";
+import { Plus, ArrowLeftRight, Search, Clock, FileText, Sheet, Printer } from "lucide-react";
+import { downloadBrandedCSV, downloadBrandedXLSX, printWithBranding } from "@/lib/export-utils";
 
 const EVENT_TYPES: Record<string, { label: string; color: string }> = {
   delivery: { label: "Entrega de linha", color: "bg-green-100 text-green-700" },
@@ -105,9 +106,14 @@ export default function MovimentacoesPage() {
             <h1 className="text-2xl font-bold text-slate-900">Movimentações</h1>
             <p className="text-slate-500 text-sm mt-1">Registre e acompanhe todas as movimentações de linhas</p>
           </div>
-          <Button onClick={() => { setForm(emptyForm); setOpen(true); }} data-testid="button-new-movement">
-            <Plus className="h-4 w-4 mr-2" /> Nova Movimentação
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => downloadBrandedCSV("Movimentações de Linhas", ["Data","Linha","Evento","Usuário Anterior","Novo Usuário","Chamado","Solicitante","Responsável TI"], filtered.map(m => [new Date(m.createdAt).toLocaleString("pt-BR",{day:"2-digit",month:"2-digit",year:"2-digit",hour:"2-digit",minute:"2-digit"}), m.line?.number||"", EVENT_TYPES[m.eventType]?.label||m.eventType, m.previousUser||"", m.newUser||"", m.ticketNumber||"", m.requestedBy||"", m.responsibleTech||""]), "movimentacoes.csv")} data-testid="button-export-csv"><FileText className="h-4 w-4 mr-1" />CSV</Button>
+            <Button variant="outline" size="sm" onClick={() => downloadBrandedXLSX("Movimentações de Linhas", ["Data","Linha","Evento","Usuário Anterior","Novo Usuário","Chamado","Solicitante","Responsável TI"], filtered.map(m => [new Date(m.createdAt).toLocaleString("pt-BR",{day:"2-digit",month:"2-digit",year:"2-digit",hour:"2-digit",minute:"2-digit"}), m.line?.number||"", EVENT_TYPES[m.eventType]?.label||m.eventType, m.previousUser||"", m.newUser||"", m.ticketNumber||"", m.requestedBy||"", m.responsibleTech||""]), "movimentacoes.xlsx", "Movimentações")} data-testid="button-export-xls"><Sheet className="h-4 w-4 mr-1" />XLS</Button>
+            <Button variant="outline" size="sm" onClick={() => printWithBranding("Movimentações de Linhas")} data-testid="button-export-pdf"><Printer className="h-4 w-4 mr-1" />PDF</Button>
+            <Button onClick={() => { setForm(emptyForm); setOpen(true); }} data-testid="button-new-movement">
+              <Plus className="h-4 w-4 mr-2" /> Nova Movimentação
+            </Button>
+          </div>
         </div>
 
         <div className="relative max-w-sm">

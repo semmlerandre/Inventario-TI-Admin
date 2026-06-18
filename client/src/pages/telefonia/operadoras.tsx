@@ -10,7 +10,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Pencil, Trash2, Building2, Search } from "lucide-react";
+import { Plus, Pencil, Trash2, Building2, Search, Download, FileText, Sheet, Printer } from "lucide-react";
+import { downloadBrandedCSV, downloadBrandedXLSX, printWithBranding } from "@/lib/export-utils";
 import type { MobileCarrier } from "@shared/schema";
 
 const empty = { name: "", cnpj: "", commercialContact: "", email: "", phone: "", notes: "" };
@@ -83,9 +84,14 @@ export default function OperadorasPage() {
             <h1 className="text-2xl font-bold text-slate-900">Operadoras</h1>
             <p className="text-slate-500 text-sm mt-1">Gerencie as operadoras de telefonia</p>
           </div>
-          <Button onClick={openCreate} data-testid="button-new-carrier">
-            <Plus className="h-4 w-4 mr-2" /> Nova Operadora
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => downloadBrandedCSV("Operadoras", ["Nome","CNPJ","Contato Comercial","E-mail","Telefone","Observações"], carriers.map(c => [c.name, c.cnpj||"", c.commercialContact||"", c.email||"", c.phone||"", c.notes||""]), "operadoras.csv")} data-testid="button-export-csv"><FileText className="h-4 w-4 mr-1" />CSV</Button>
+            <Button variant="outline" size="sm" onClick={() => downloadBrandedXLSX("Operadoras", ["Nome","CNPJ","Contato Comercial","E-mail","Telefone","Observações"], carriers.map(c => [c.name, c.cnpj||"", c.commercialContact||"", c.email||"", c.phone||"", c.notes||""]), "operadoras.xlsx", "Operadoras")} data-testid="button-export-xls"><Sheet className="h-4 w-4 mr-1" />XLS</Button>
+            <Button variant="outline" size="sm" onClick={() => printWithBranding("Operadoras")} data-testid="button-export-pdf"><Printer className="h-4 w-4 mr-1" />PDF</Button>
+            <Button onClick={openCreate} data-testid="button-new-carrier">
+              <Plus className="h-4 w-4 mr-2" /> Nova Operadora
+            </Button>
+          </div>
         </div>
 
         <div className="relative max-w-xs">

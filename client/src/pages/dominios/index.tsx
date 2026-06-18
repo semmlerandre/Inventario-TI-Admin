@@ -14,8 +14,9 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   Plus, Globe, Shield, RefreshCw, Trash2, Pencil, Bell, AlertTriangle,
-  CheckCircle2, XCircle, Clock, LayoutDashboard
+  CheckCircle2, XCircle, Clock, LayoutDashboard, FileText, Sheet, Printer
 } from "lucide-react";
+import { downloadBrandedCSV, downloadBrandedXLSX, printWithBranding } from "@/lib/export-utils";
 import { Link, useLocation } from "wouter";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -118,6 +119,9 @@ export default function DominiosPage() {
               <RefreshCw className={`h-4 w-4 mr-2 ${checkAllMutation.isPending ? "animate-spin" : ""}`} />
               Verificar Agora
             </Button>
+            <Button variant="outline" size="sm" onClick={() => downloadBrandedCSV("Domínios & SSL", ["Domínio","Ambiente","Provedor","Renovação (dias)","SSL Vencimento (dias)","Emissor SSL"], domains.map(d => [d.domainName, d.environment, d.provider||"", daysUntil(d.renewalDate)??"-", d.certificate?.expirationDate ? (daysUntil(d.certificate.expirationDate)??"-") : "-", d.certificate?.issuer||"-"]), "dominios.csv")} data-testid="btn-export-csv"><FileText className="h-4 w-4 mr-1" />CSV</Button>
+            <Button variant="outline" size="sm" onClick={() => downloadBrandedXLSX("Domínios & SSL", ["Domínio","Ambiente","Provedor","Renovação (dias)","SSL Vencimento (dias)","Emissor SSL"], domains.map(d => [d.domainName, d.environment, d.provider||"", daysUntil(d.renewalDate)??"-", d.certificate?.expirationDate ? (daysUntil(d.certificate.expirationDate)??"-") : "-", d.certificate?.issuer||"-"]), "dominios.xlsx", "Domínios")} data-testid="btn-export-xls"><Sheet className="h-4 w-4 mr-1" />XLS</Button>
+            <Button variant="outline" size="sm" onClick={() => printWithBranding("Domínios & SSL")} data-testid="btn-export-pdf"><Printer className="h-4 w-4 mr-1" />PDF</Button>
             <Button asChild data-testid="btn-add-domain">
               <Link href="/dominios/novo">
                 <Plus className="h-4 w-4 mr-2" />

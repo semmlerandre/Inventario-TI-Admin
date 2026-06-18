@@ -11,7 +11,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Pencil, Trash2, CreditCard, Search } from "lucide-react";
+import { Plus, Pencil, Trash2, CreditCard, Search, FileText, Sheet, Printer } from "lucide-react";
+import { downloadBrandedCSV, downloadBrandedXLSX, printWithBranding } from "@/lib/export-utils";
 import type { MobilePlan, MobileCarrier } from "@shared/schema";
 
 const PLAN_TYPES: Record<string, string> = {
@@ -91,9 +92,14 @@ export default function PlanosPage() {
             <h1 className="text-2xl font-bold text-slate-900">Planos</h1>
             <p className="text-slate-500 text-sm mt-1">Gerencie os planos por operadora</p>
           </div>
-          <Button onClick={openCreate} data-testid="button-new-plan">
-            <Plus className="h-4 w-4 mr-2" /> Novo Plano
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => downloadBrandedCSV("Planos de Telefonia", ["Plano","Operadora","Tipo","Franquia","Minutos","Valor/mês"], filtered.map(p => [p.name, p.carrier?.name||"", PLAN_TYPES[p.type]||p.type, p.dataAllowance||"", p.minutes||"", p.monthlyValue ? `R$ ${Number(p.monthlyValue).toLocaleString("pt-BR",{minimumFractionDigits:2})}` : ""]), "planos.csv")} data-testid="button-export-csv"><FileText className="h-4 w-4 mr-1" />CSV</Button>
+            <Button variant="outline" size="sm" onClick={() => downloadBrandedXLSX("Planos de Telefonia", ["Plano","Operadora","Tipo","Franquia","Minutos","Valor/mês"], filtered.map(p => [p.name, p.carrier?.name||"", PLAN_TYPES[p.type]||p.type, p.dataAllowance||"", p.minutes||"", p.monthlyValue ? `R$ ${Number(p.monthlyValue).toLocaleString("pt-BR",{minimumFractionDigits:2})}` : ""]), "planos.xlsx", "Planos")} data-testid="button-export-xls"><Sheet className="h-4 w-4 mr-1" />XLS</Button>
+            <Button variant="outline" size="sm" onClick={() => printWithBranding("Planos de Telefonia")} data-testid="button-export-pdf"><Printer className="h-4 w-4 mr-1" />PDF</Button>
+            <Button onClick={openCreate} data-testid="button-new-plan">
+              <Plus className="h-4 w-4 mr-2" /> Novo Plano
+            </Button>
+          </div>
         </div>
 
         <div className="relative max-w-xs">
