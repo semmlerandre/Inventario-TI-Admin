@@ -37,6 +37,13 @@ export const items = pgTable("items", {
   stock: integer("stock").notNull().default(0),
   minStock: integer("min_stock").notNull().default(5),
   createdAt: timestamp("created_at").defaultNow(),
+  // Campos adicionais por categoria
+  hostname: text("hostname"),
+  model: text("model"),
+  supplier: text("supplier"),
+  serialNumber: text("serial_number"),
+  equipmentType: text("equipment_type"),
+  ownership: text("ownership"), // 'proprio' | 'alugado'
 });
 
 export const transactions = pgTable("transactions", {

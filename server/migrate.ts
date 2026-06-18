@@ -171,6 +171,16 @@ async function migrate() {
       );
     `);
 
+    // Colunas extras da tabela items (adicionadas via ALTER para compatibilidade)
+    await pool.query(`
+      ALTER TABLE items ADD COLUMN IF NOT EXISTS hostname       TEXT;
+      ALTER TABLE items ADD COLUMN IF NOT EXISTS model          TEXT;
+      ALTER TABLE items ADD COLUMN IF NOT EXISTS supplier       TEXT;
+      ALTER TABLE items ADD COLUMN IF NOT EXISTS serial_number  TEXT;
+      ALTER TABLE items ADD COLUMN IF NOT EXISTS equipment_type TEXT;
+      ALTER TABLE items ADD COLUMN IF NOT EXISTS ownership      TEXT;
+    `);
+
     console.log("Tabelas criadas com sucesso!");
   } catch (err) {
     console.error("Erro ao criar tabelas:", err);
