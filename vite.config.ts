@@ -37,4 +37,7 @@ export default defineConfig({
       deny: ["**/.*"],
     },
   },
+  optimizeDeps: {
+    include: ["xlsx-js-style"],
+  },
 });
