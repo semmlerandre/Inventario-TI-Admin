@@ -3,17 +3,32 @@ import { useTransactions } from "@/hooks/use-transactions";
 import { Card } from "@/components/ui/card";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { ArrowDownToLine, ArrowUpToLine, History, Download } from "lucide-react";
+import { ArrowDownToLine, ArrowUpToLine, History, Download, FileSpreadsheet } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { downloadBrandedCSV, downloadBrandedXLSX, printWithBranding } from "@/lib/export-utils";
+
+const TX_HEADERS = ["Data/Hora", "Tipo", "Item", "Quantidade", "Chamado", "Solicitante", "Departamento"];
 
 export default function TransactionsPage() {
   const { data: transactions = [], isLoading } = useTransactions();
 
-  // Sort by newest first
-  const sortedTransactions = [...transactions].sort((a, b) => 
+  const sortedTransactions = [...transactions].sort((a, b) =>
     new Date(b.createdAt!).getTime() - new Date(a.createdAt!).getTime()
   );
+
+  const today = new Date().toISOString().substring(0, 10);
+
+  const txRows = () =>
+    sortedTransactions.map((t) => [
+      format(new Date(t.createdAt!), "dd/MM/yyyy HH:mm", { locale: ptBR }),
+      t.type === "in" ? "Entrada" : "Saída",
+      t.item?.name ?? "",
+      t.quantity,
+      t.ticketNumber ?? "",
+      t.requesterName ?? "",
+      t.department ?? "",
+    ]);
 
   return (
     <AppLayout>
@@ -23,9 +38,17 @@ export default function TransactionsPage() {
             <h1 className="text-3xl font-display font-bold text-slate-900">Histórico de Movimentações</h1>
             <p className="text-slate-500 mt-1">Acompanhe o registro de entradas e saídas do estoque.</p>
           </div>
-          <Button variant="outline" onClick={() => window.print()}>
-            <Download className="w-4 h-4 mr-2" /> Exportar PDF
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => downloadBrandedCSV("Movimentações de Estoque", TX_HEADERS, txRows(), `movimentacoes-${today}.csv`)}>
+              <Download className="w-4 h-4 mr-2" /> CSV
+            </Button>
+            <Button variant="outline" onClick={() => downloadBrandedXLSX("Movimentações de Estoque", TX_HEADERS, txRows(), `movimentacoes-${today}.xlsx`, "Movimentações")} className="border-green-300 text-green-700 hover:bg-green-50">
+              <FileSpreadsheet className="w-4 h-4 mr-2" /> XLS
+            </Button>
+            <Button variant="outline" onClick={() => printWithBranding("Histórico de Movimentações de Estoque")}>
+              <Download className="w-4 h-4 mr-2" /> PDF
+            </Button>
+          </div>
         </div>
 
         <Card className="border-none shadow-md shadow-slate-200/50 overflow-hidden">

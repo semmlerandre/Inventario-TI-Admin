@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import * as XLSX from "xlsx";
 import { AppLayout } from "@/components/layout/app-layout";
+import { downloadBrandedCSV, downloadBrandedXLSX } from "@/lib/export-utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -12,24 +12,6 @@ import { Download, Search, FileSpreadsheet } from "lucide-react";
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
-function exportCSV(filename: string, rows: string[][], headers: string[]) {
-  const BOM = "\uFEFF";
-  const lines = [headers, ...rows]
-    .map(r => r.map(c => `"${String(c ?? "").replace(/"/g, '""')}"`).join(";"))
-    .join("\r\n");
-  const blob = new Blob([BOM + lines], { type: "text/csv;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url; a.download = filename; a.click();
-  URL.revokeObjectURL(url);
-}
-
-function exportXLS(filename: string, rows: (string | number)[][], headers: string[]) {
-  const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "Relatório");
-  XLSX.writeFile(wb, filename);
-}
 
 // ─── label maps ─────────────────────────────────────────────────────────────
 
@@ -168,17 +150,17 @@ export default function RelatoriosPage() {
   const movementHeaders = ["Data", "Linha", "Evento", "Usuário Anterior", "Novo Usuário", "Chamado", "Responsável TI"];
 
   // ── export fns ────────────────────────────────────────────────────────────
-  const exportLines = () => exportCSV(`relatorio-linhas-${today}.csv`, lineRows(), lineHeaders);
-  const exportLinesXLS = () => exportXLS(`relatorio-linhas-${today}.xlsx`, lineRows(), lineHeaders);
+  const exportLines = () => downloadBrandedCSV("Telefonia Móvel — Linhas", lineHeaders, lineRows(), `relatorio-linhas-${today}.csv`);
+  const exportLinesXLS = () => downloadBrandedXLSX("Telefonia Móvel — Linhas", lineHeaders, lineRows(), `relatorio-linhas-${today}.xlsx`, "Linhas");
 
-  const exportInventario = () => exportCSV(`relatorio-inventario-${today}.csv`, inventoryRows(), inventoryHeaders);
-  const exportInventarioXLS = () => exportXLS(`relatorio-inventario-${today}.xlsx`, inventoryRows(), inventoryHeaders);
+  const exportInventario = () => downloadBrandedCSV("Telefonia Móvel — Inventário Disponível", inventoryHeaders, inventoryRows(), `relatorio-inventario-${today}.csv`);
+  const exportInventarioXLS = () => downloadBrandedXLSX("Telefonia Móvel — Inventário Disponível", inventoryHeaders, inventoryRows(), `relatorio-inventario-${today}.xlsx`, "Inventário");
 
-  const exportCustos = () => exportCSV(`relatorio-custos-${today}.csv`, costRows(), costHeaders);
-  const exportCustosXLS = () => exportXLS(`relatorio-custos-${today}.xlsx`, costRows(), costHeaders);
+  const exportCustos = () => downloadBrandedCSV("Telefonia Móvel — Análise de Custos", costHeaders, costRows(), `relatorio-custos-${today}.csv`);
+  const exportCustosXLS = () => downloadBrandedXLSX("Telefonia Móvel — Análise de Custos", costHeaders, costRows(), `relatorio-custos-${today}.xlsx`, "Custos");
 
-  const exportHistorico = (filter: string) => exportCSV(`relatorio-historico-${today}.csv`, movementRows(filter), movementHeaders);
-  const exportHistoricoXLS = (filter: string) => exportXLS(`relatorio-historico-${today}.xlsx`, movementRows(filter), movementHeaders);
+  const exportHistorico = (filter: string) => downloadBrandedCSV("Telefonia Móvel — Histórico de Movimentações", movementHeaders, movementRows(filter), `relatorio-historico-${today}.csv`);
+  const exportHistoricoXLS = (filter: string) => downloadBrandedXLSX("Telefonia Móvel — Histórico de Movimentações", movementHeaders, movementRows(filter), `relatorio-historico-${today}.xlsx`, "Histórico");
 
   // ─── cost table data ──────────────────────────────────────────────────────
   const costData = (() => {

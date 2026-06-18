@@ -3,7 +3,8 @@ import { useWatch } from "react-hook-form";
 import { AppLayout } from "@/components/layout/app-layout";
 import { useItems, useCreateItem, useUpdateItem, useDeleteItem } from "@/hooks/use-items";
 import { useTransactions, useCreateTransaction } from "@/hooks/use-transactions";
-import { Plus, Search, MoreVertical, Edit2, Trash2, ArrowDownToLine, ArrowUpToLine, AlertCircle, Download, Users, Cpu, Monitor } from "lucide-react";
+import { Plus, Search, MoreVertical, Edit2, Trash2, ArrowDownToLine, ArrowUpToLine, AlertCircle, Download, FileSpreadsheet, Users, Cpu, Monitor } from "lucide-react";
+import { downloadBrandedCSV, downloadBrandedXLSX, printWithBranding } from "@/lib/export-utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -374,22 +375,24 @@ export default function InventoryPage() {
     });
   };
 
-  const downloadXLSX = () => {
-    let content = "\uFEFFNome;Categoria;Tipo;Hostname;Modelo;Fornecedor;N° Série;Propriedade;Estoque Atual;Status\n";
-    filteredItems.forEach((item) => {
-      const status = item.stock <= item.minStock ? "Baixo" : "Normal";
-      const esc = (v: string | null | undefined) => (v ?? "").replace(/;/g, ",");
-      content += `${esc(item.name)};${esc(item.category)};${esc(item.equipmentType)};${esc(item.hostname)};${esc(item.model)};${esc(item.supplier)};${esc(item.serialNumber)};${esc(item.ownership)};${item.stock};${status}\n`;
-    });
-    const blob = new Blob([content], { type: "text/csv;charset=utf-8;" });
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.download = `estoque_${new Date().toLocaleDateString()}.csv`;
-    link.style.visibility = "hidden";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
+  const today = new Date().toISOString().substring(0, 10);
+
+  const ITEM_HEADERS = ["Nome", "Categoria", "Tipo", "Hostname", "Modelo", "Fornecedor", "N° Série", "Propriedade", "Estoque Atual", "Mínimo", "Status"];
+
+  const itemRows = () =>
+    filteredItems.map((item) => [
+      item.name,
+      item.category,
+      item.equipmentType ?? "",
+      item.hostname ?? "",
+      item.model ?? "",
+      item.supplier ?? "",
+      item.serialNumber ?? "",
+      item.ownership === "alugado" ? "Alugado" : item.ownership === "proprio" ? "Próprio" : "",
+      item.stock,
+      item.minStock,
+      item.stock <= item.minStock ? "Baixo" : "Normal",
+    ]);
 
   // Helper: ícone por categoria
   const CategoryIcon = ({ category }: { category: string }) => {
@@ -424,12 +427,15 @@ export default function InventoryPage() {
                 data-testid="input-search"
               />
             </div>
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm" onClick={downloadXLSX} className="hidden md:flex no-print">
-                <Download className="w-4 h-4 mr-2" /> Excel / CSV
+            <div className="flex gap-2 no-print">
+              <Button variant="outline" size="sm" onClick={() => downloadBrandedCSV("Inventário de TI", ITEM_HEADERS, itemRows(), `estoque-${today}.csv`)} className="hidden md:flex">
+                <Download className="w-4 h-4 mr-2" /> CSV
               </Button>
-              <Button variant="outline" size="sm" onClick={() => window.print()} className="hidden md:flex no-print">
-                <Download className="w-4 h-4 mr-2" /> PDF / Relatório
+              <Button variant="outline" size="sm" onClick={() => downloadBrandedXLSX("Inventário de TI", ITEM_HEADERS, itemRows(), `estoque-${today}.xlsx`, "Estoque")} className="hidden md:flex border-green-300 text-green-700 hover:bg-green-50">
+                <FileSpreadsheet className="w-4 h-4 mr-2" /> XLS
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => printWithBranding("Relatório de Estoque de TI")} className="hidden md:flex">
+                <Download className="w-4 h-4 mr-2" /> PDF
               </Button>
             </div>
           </div>

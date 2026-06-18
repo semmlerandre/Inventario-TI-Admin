@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
-import * as XLSX from "xlsx";
 import { AppLayout } from "@/components/layout/app-layout";
+import { downloadBrandedCSV, downloadBrandedXLSX } from "@/lib/export-utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -53,23 +53,6 @@ function fmtDateTime(d: string | Date | null | undefined) {
 
 const today = new Date().toISOString().substring(0, 10);
 
-function exportCSV(filename: string, rows: string[][], headers: string[]) {
-  const BOM = "\uFEFF";
-  const lines = [headers, ...rows]
-    .map(r => r.map(c => `"${String(c ?? "").replace(/"/g, '""')}"`).join(";"))
-    .join("\r\n");
-  const blob = new Blob([BOM + lines], { type: "text/csv;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a"); a.href = url; a.download = filename; a.click();
-  URL.revokeObjectURL(url);
-}
-
-function exportXLS(filename: string, rows: (string | number)[][], headers: string[]) {
-  const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "Relatório");
-  XLSX.writeFile(wb, filename);
-}
 
 export default function DominiosRelatoriosPage() {
   const { data: domains = [], isLoading: loadingDomains } = useQuery<DomainWithCert[]>({ queryKey: ["/api/domains"] });
@@ -137,10 +120,10 @@ export default function DominiosRelatoriosPage() {
   }
   const notifHeaders = ["Domínio", "Tipo", "Intervalo", "Status", "Data/Hora", "Detalhe Erro"];
 
-  const exportDomainCSV = () => exportCSV(`relatorio-dominios-${today}.csv`, domainRows(), domainHeaders);
-  const exportDomainXLS = () => exportXLS(`relatorio-dominios-${today}.xlsx`, domainRows(), domainHeaders);
-  const exportNotifCSV = () => exportCSV(`relatorio-alertas-dominios-${today}.csv`, notifRows(), notifHeaders);
-  const exportNotifXLS = () => exportXLS(`relatorio-alertas-dominios-${today}.xlsx`, notifRows(), notifHeaders);
+  const exportDomainCSV = () => downloadBrandedCSV("Domínios e Certificados SSL", domainHeaders, domainRows(), `relatorio-dominios-${today}.csv`);
+  const exportDomainXLS = () => downloadBrandedXLSX("Domínios e Certificados SSL", domainHeaders, domainRows(), `relatorio-dominios-${today}.xlsx`, "Domínios SSL");
+  const exportNotifCSV = () => downloadBrandedCSV("Alertas de Domínios Enviados", notifHeaders, notifRows(), `relatorio-alertas-dominios-${today}.csv`);
+  const exportNotifXLS = () => downloadBrandedXLSX("Alertas de Domínios Enviados", notifHeaders, notifRows(), `relatorio-alertas-dominios-${today}.xlsx`, "Alertas");
 
   return (
     <AppLayout>
