@@ -2,6 +2,7 @@ import { db } from "./db";
 import {
   users, settings, items, transactions,
   mobileCarriers, mobilePlans, mobileChips, mobileDevices, mobileLines, mobileLineMovements,
+  equipmentUnits, equipmentMovements,
   domains, certificates, domainNotifications,
   type User, type InsertUser,
   type Settings, type InsertSettings, type UpdateSettingsRequest,
@@ -13,6 +14,8 @@ import {
   type MobileDevice, type InsertMobileDevice,
   type MobileLine, type InsertMobileLine,
   type MobileLineMovement, type InsertMobileLineMovement,
+  type EquipmentUnit, type InsertEquipmentUnit,
+  type EquipmentMovement, type InsertEquipmentMovement,
   type Domain, type InsertDomain,
   type Certificate, type InsertCertificate,
   type DomainNotification, type InsertDomainNotification,

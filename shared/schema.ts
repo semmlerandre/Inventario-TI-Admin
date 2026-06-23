@@ -185,6 +185,53 @@ export const mobileLineMovementsRelations = relations(mobileLineMovements, ({ on
   line: one(mobileLines, { fields: [mobileLineMovements.lineId], references: [mobileLines.id] }),
 }));
 
+// ==================== RASTREIO DE EQUIPAMENTOS ====================
+
+export const equipmentUnits = pgTable("equipment_units", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  serialNumber: text("serial_number").notNull().unique(),
+  model: text("model"),
+  manufacturer: text("manufacturer"),
+  category: text("category").default("Notebook"),
+  status: text("status").notNull().default("em_estoque"), // em_estoque | em_uso | em_manutencao | descartado
+  currentUser: text("current_user"),
+  currentDepartment: text("current_department"),
+  acquisitionDate: text("acquisition_date"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const equipmentMovements = pgTable("equipment_movements", {
+  id: serial("id").primaryKey(),
+  unitId: integer("unit_id").notNull().references(() => equipmentUnits.id, { onDelete: "cascade" }),
+  type: text("type").notNull(), // nova_contratacao | troca_defeito | transferencia | retorno_estoque | manutencao | descarte | outros
+  previousUser: text("previous_user"),
+  previousDepartment: text("previous_department"),
+  newUser: text("new_user"),
+  newDepartment: text("new_department"),
+  ticketNumber: text("ticket_number"),
+  notes: text("notes"),
+  performedBy: text("performed_by"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const equipmentUnitsRelations = relations(equipmentUnits, ({ many }) => ({
+  movements: many(equipmentMovements),
+}));
+
+export const equipmentMovementsRelations = relations(equipmentMovements, ({ one }) => ({
+  unit: one(equipmentUnits, { fields: [equipmentMovements.unitId], references: [equipmentUnits.id] }),
+}));
+
+export const insertEquipmentUnitSchema = createInsertSchema(equipmentUnits).omit({ id: true, createdAt: true });
+export const insertEquipmentMovementSchema = createInsertSchema(equipmentMovements).omit({ id: true, createdAt: true });
+
+export type EquipmentUnit = typeof equipmentUnits.$inferSelect;
+export type EquipmentMovement = typeof equipmentMovements.$inferSelect;
+export type InsertEquipmentUnit = z.infer<typeof insertEquipmentUnitSchema>;
+export type InsertEquipmentMovement = z.infer<typeof insertEquipmentMovementSchema>;
+
 // ==================== DOMÍNIOS & SSL ====================
 
 export const domains = pgTable("domains", {
