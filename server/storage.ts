@@ -632,6 +632,66 @@ export class DatabaseStorage implements IStorage {
     );
     return rows.length > 0;
   }
+
+  // ==================== RASTREIO DE EQUIPAMENTOS ====================
+
+  async getEquipmentUnits(): Promise<EquipmentUnit[]> {
+    return db.select().from(equipmentUnits).orderBy(desc(equipmentUnits.createdAt));
+  }
+
+  async getEquipmentUnit(id: number): Promise<EquipmentUnit | undefined> {
+    const [unit] = await db.select().from(equipmentUnits).where(eq(equipmentUnits.id, id));
+    return unit;
+  }
+
+  async createEquipmentUnit(data: InsertEquipmentUnit): Promise<EquipmentUnit> {
+    const [unit] = await db.insert(equipmentUnits).values(data).returning();
+    return unit;
+  }
+
+  async updateEquipmentUnit(id: number, data: Partial<InsertEquipmentUnit>): Promise<EquipmentUnit> {
+    const [unit] = await db.update(equipmentUnits).set(data).where(eq(equipmentUnits.id, id)).returning();
+    return unit;
+  }
+
+  async deleteEquipmentUnit(id: number): Promise<void> {
+    await db.delete(equipmentUnits).where(eq(equipmentUnits.id, id));
+  }
+
+  async getEquipmentMovements(unitId?: number): Promise<(EquipmentMovement & { unit: EquipmentUnit })[]> {
+    let q = db.select({ movement: equipmentMovements, unit: equipmentUnits })
+      .from(equipmentMovements)
+      .leftJoin(equipmentUnits, eq(equipmentMovements.unitId, equipmentUnits.id))
+      .$dynamic();
+    if (unitId) q = q.where(eq(equipmentMovements.unitId, unitId));
+    const rows = await q.orderBy(desc(equipmentMovements.createdAt));
+    return rows.map(r => ({ ...r.movement, unit: r.unit! }));
+  }
+
+  async createEquipmentMovement(data: InsertEquipmentMovement): Promise<EquipmentMovement> {
+    const [movement] = await db.insert(equipmentMovements).values(data).returning();
+    // Update unit's current user/department/status based on movement type
+    const updates: Partial<InsertEquipmentUnit> = {};
+    if (data.type === "retorno_estoque") {
+      updates.status = "em_estoque";
+      updates.currentHolder = null;
+      updates.currentDepartment = null;
+    } else if (data.type === "manutencao") {
+      updates.status = "em_manutencao";
+    } else if (data.type === "descarte") {
+      updates.status = "descartado";
+      updates.currentHolder = null;
+      updates.currentDepartment = null;
+    } else if (["nova_contratacao", "troca_defeito", "transferencia", "outros"].includes(data.type)) {
+      updates.status = "em_uso";
+      if (data.newUser !== undefined) updates.currentHolder = data.newUser || null;
+      if (data.newDepartment !== undefined) updates.currentDepartment = data.newDepartment || null;
+    }
+    if (Object.keys(updates).length > 0) {
+      await db.update(equipmentUnits).set(updates).where(eq(equipmentUnits.id, data.unitId));
+    }
+    return movement;
+  }
 }
 
 export const storage = new DatabaseStorage();

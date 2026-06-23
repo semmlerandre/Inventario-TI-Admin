@@ -195,7 +195,7 @@ export const equipmentUnits = pgTable("equipment_units", {
   manufacturer: text("manufacturer"),
   category: text("category").default("Notebook"),
   status: text("status").notNull().default("em_estoque"), // em_estoque | em_uso | em_manutencao | descartado
-  currentUser: text("current_user"),
+  currentHolder: text("current_holder"),
   currentDepartment: text("current_department"),
   acquisitionDate: text("acquisition_date"),
   notes: text("notes"),

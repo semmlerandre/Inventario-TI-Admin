@@ -572,6 +572,62 @@ export async function registerRoutes(
     res.json(data);
   });
 
+  // ==================== RASTREIO DE EQUIPAMENTOS ====================
+  const { insertEquipmentUnitSchema, insertEquipmentMovementSchema } = await import("@shared/schema");
+
+  app.get("/api/equipment-units", requireAuth, async (_req, res) => {
+    try {
+      const units = await storage.getEquipmentUnits();
+      res.json(units);
+    } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
+
+  app.get("/api/equipment-units/:id", requireAuth, async (req, res) => {
+    try {
+      const unit = await storage.getEquipmentUnit(Number(req.params.id));
+      if (!unit) return res.status(404).json({ message: "Não encontrado" });
+      res.json(unit);
+    } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
+
+  app.post("/api/equipment-units", requireAuth, async (req, res) => {
+    try {
+      const data = insertEquipmentUnitSchema.parse(req.body);
+      const unit = await storage.createEquipmentUnit(data);
+      res.status(201).json(unit);
+    } catch (e: any) { res.status(400).json({ message: e.message }); }
+  });
+
+  app.patch("/api/equipment-units/:id", requireAuth, async (req, res) => {
+    try {
+      const unit = await storage.updateEquipmentUnit(Number(req.params.id), req.body);
+      res.json(unit);
+    } catch (e: any) { res.status(400).json({ message: e.message }); }
+  });
+
+  app.delete("/api/equipment-units/:id", requireAuth, async (req, res) => {
+    try {
+      await storage.deleteEquipmentUnit(Number(req.params.id));
+      res.status(204).send();
+    } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
+
+  app.get("/api/equipment-movements", requireAuth, async (req, res) => {
+    try {
+      const unitId = req.query.unitId ? Number(req.query.unitId) : undefined;
+      const movements = await storage.getEquipmentMovements(unitId);
+      res.json(movements);
+    } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
+
+  app.post("/api/equipment-movements", requireAuth, async (req, res) => {
+    try {
+      const data = insertEquipmentMovementSchema.parse(req.body);
+      const movement = await storage.createEquipmentMovement(data);
+      res.status(201).json(movement);
+    } catch (e: any) { res.status(400).json({ message: e.message }); }
+  });
+
   // Init seed
   await seedDatabase();
 
