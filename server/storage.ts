@@ -2,7 +2,7 @@ import { db } from "./db";
 import {
   users, settings, items, transactions,
   mobileCarriers, mobilePlans, mobileChips, mobileDevices, mobileLines, mobileLineMovements,
-  equipmentUnits, equipmentMovements,
+  equipmentMovements,
   domains, certificates, domainNotifications,
   type User, type InsertUser,
   type Settings, type InsertSettings, type UpdateSettingsRequest,
@@ -14,7 +14,6 @@ import {
   type MobileDevice, type InsertMobileDevice,
   type MobileLine, type InsertMobileLine,
   type MobileLineMovement, type InsertMobileLineMovement,
-  type EquipmentUnit, type InsertEquipmentUnit,
   type EquipmentMovement, type InsertEquipmentMovement,
   type Domain, type InsertDomain,
   type Certificate, type InsertCertificate,
@@ -635,60 +634,37 @@ export class DatabaseStorage implements IStorage {
 
   // ==================== RASTREIO DE EQUIPAMENTOS ====================
 
-  async getEquipmentUnits(): Promise<EquipmentUnit[]> {
-    return db.select().from(equipmentUnits).orderBy(desc(equipmentUnits.createdAt));
-  }
-
-  async getEquipmentUnit(id: number): Promise<EquipmentUnit | undefined> {
-    const [unit] = await db.select().from(equipmentUnits).where(eq(equipmentUnits.id, id));
-    return unit;
-  }
-
-  async createEquipmentUnit(data: InsertEquipmentUnit): Promise<EquipmentUnit> {
-    const [unit] = await db.insert(equipmentUnits).values(data).returning();
-    return unit;
-  }
-
-  async updateEquipmentUnit(id: number, data: Partial<InsertEquipmentUnit>): Promise<EquipmentUnit> {
-    const [unit] = await db.update(equipmentUnits).set(data).where(eq(equipmentUnits.id, id)).returning();
-    return unit;
-  }
-
-  async deleteEquipmentUnit(id: number): Promise<void> {
-    await db.delete(equipmentUnits).where(eq(equipmentUnits.id, id));
-  }
-
-  async getEquipmentMovements(unitId?: number): Promise<(EquipmentMovement & { unit: EquipmentUnit })[]> {
-    let q = db.select({ movement: equipmentMovements, unit: equipmentUnits })
+  async getEquipmentMovements(itemId?: number): Promise<(EquipmentMovement & { item: Item })[]> {
+    let q = db.select({ movement: equipmentMovements, item: items })
       .from(equipmentMovements)
-      .leftJoin(equipmentUnits, eq(equipmentMovements.unitId, equipmentUnits.id))
+      .leftJoin(items, eq(equipmentMovements.itemId, items.id))
       .$dynamic();
-    if (unitId) q = q.where(eq(equipmentMovements.unitId, unitId));
+    if (itemId) q = q.where(eq(equipmentMovements.itemId, itemId));
     const rows = await q.orderBy(desc(equipmentMovements.createdAt));
-    return rows.map(r => ({ ...r.movement, unit: r.unit! }));
+    return rows.map(r => ({ ...r.movement, item: r.item! }));
   }
 
   async createEquipmentMovement(data: InsertEquipmentMovement): Promise<EquipmentMovement> {
     const [movement] = await db.insert(equipmentMovements).values(data).returning();
-    // Update unit's current user/department/status based on movement type
-    const updates: Partial<InsertEquipmentUnit> = {};
+    // Update item's tracking fields based on movement type
+    const updates: Partial<InsertItem> = {};
     if (data.type === "retorno_estoque") {
-      updates.status = "em_estoque";
+      updates.eqStatus = "em_estoque";
       updates.currentHolder = null;
       updates.currentDepartment = null;
     } else if (data.type === "manutencao") {
-      updates.status = "em_manutencao";
+      updates.eqStatus = "em_manutencao";
     } else if (data.type === "descarte") {
-      updates.status = "descartado";
+      updates.eqStatus = "descartado";
       updates.currentHolder = null;
       updates.currentDepartment = null;
     } else if (["nova_contratacao", "troca_defeito", "transferencia", "outros"].includes(data.type)) {
-      updates.status = "em_uso";
+      updates.eqStatus = "em_uso";
       if (data.newUser !== undefined) updates.currentHolder = data.newUser || null;
       if (data.newDepartment !== undefined) updates.currentDepartment = data.newDepartment || null;
     }
     if (Object.keys(updates).length > 0) {
-      await db.update(equipmentUnits).set(updates).where(eq(equipmentUnits.id, data.unitId));
+      await db.update(items).set(updates).where(eq(items.id, data.itemId));
     }
     return movement;
   }

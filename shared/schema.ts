@@ -44,6 +44,10 @@ export const items = pgTable("items", {
   serialNumber: text("serial_number"),
   equipmentType: text("equipment_type"),
   ownership: text("ownership"), // 'proprio' | 'alugado'
+  // Rastreio de equipamentos (Hardware)
+  currentHolder: text("current_holder"),
+  currentDepartment: text("current_department"),
+  eqStatus: text("eq_status").default("em_estoque"), // em_estoque | em_uso | em_manutencao | descartado
 });
 
 export const transactions = pgTable("transactions", {
@@ -187,24 +191,9 @@ export const mobileLineMovementsRelations = relations(mobileLineMovements, ({ on
 
 // ==================== RASTREIO DE EQUIPAMENTOS ====================
 
-export const equipmentUnits = pgTable("equipment_units", {
-  id: serial("id").primaryKey(),
-  name: text("name").notNull(),
-  serialNumber: text("serial_number").notNull().unique(),
-  model: text("model"),
-  manufacturer: text("manufacturer"),
-  category: text("category").default("Notebook"),
-  status: text("status").notNull().default("em_estoque"), // em_estoque | em_uso | em_manutencao | descartado
-  currentHolder: text("current_holder"),
-  currentDepartment: text("current_department"),
-  acquisitionDate: text("acquisition_date"),
-  notes: text("notes"),
-  createdAt: timestamp("created_at").defaultNow(),
-});
-
 export const equipmentMovements = pgTable("equipment_movements", {
   id: serial("id").primaryKey(),
-  unitId: integer("unit_id").notNull().references(() => equipmentUnits.id, { onDelete: "cascade" }),
+  itemId: integer("item_id").notNull().references(() => items.id, { onDelete: "cascade" }),
   type: text("type").notNull(), // nova_contratacao | troca_defeito | transferencia | retorno_estoque | manutencao | descarte | outros
   previousUser: text("previous_user"),
   previousDepartment: text("previous_department"),
@@ -216,20 +205,13 @@ export const equipmentMovements = pgTable("equipment_movements", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-export const equipmentUnitsRelations = relations(equipmentUnits, ({ many }) => ({
-  movements: many(equipmentMovements),
-}));
-
 export const equipmentMovementsRelations = relations(equipmentMovements, ({ one }) => ({
-  unit: one(equipmentUnits, { fields: [equipmentMovements.unitId], references: [equipmentUnits.id] }),
+  item: one(items, { fields: [equipmentMovements.itemId], references: [items.id] }),
 }));
 
-export const insertEquipmentUnitSchema = createInsertSchema(equipmentUnits).omit({ id: true, createdAt: true });
 export const insertEquipmentMovementSchema = createInsertSchema(equipmentMovements).omit({ id: true, createdAt: true });
 
-export type EquipmentUnit = typeof equipmentUnits.$inferSelect;
 export type EquipmentMovement = typeof equipmentMovements.$inferSelect;
-export type InsertEquipmentUnit = z.infer<typeof insertEquipmentUnitSchema>;
 export type InsertEquipmentMovement = z.infer<typeof insertEquipmentMovementSchema>;
 
 // ==================== DOMÍNIOS & SSL ====================
