@@ -192,6 +192,7 @@ const PRESET_COLORS = [
 
 export default function SettingsPage() {
   const { user } = useAuth();
+  const { toast } = useToast();
   const { data: settings, isLoading } = useSettings();
   const updateSettings = useUpdateSettings();
   const changePassword = useChangePassword();
@@ -327,7 +328,7 @@ export default function SettingsPage() {
                   <FormField control={settingsForm.control} name="appName" render={({ field }) => (
                     <FormItem>
                       <FormLabel>Nome da Aplicação</FormLabel>
-                      <FormControl><Input {...field} /></FormControl>
+                      <FormControl><Input {...field} value={field.value ?? ""} /></FormControl>
                       <FormMessage />
                     </FormItem>
                   )} />

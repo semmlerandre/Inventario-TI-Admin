@@ -11,7 +11,7 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { ArrowDownToLine, ArrowUpToLine, History, Download, FileSpreadsheet, Search, Package, ArrowRight } from "lucide-react";
 import { downloadBrandedCSV, downloadBrandedXLSX, printWithBranding } from "@/lib/export-utils";
-import type { EquipmentUnit } from "@shared/schema";
+import type { Item } from "@shared/schema";
 
 const TX_HEADERS = ["Data/Hora", "Tipo", "Item", "Quantidade", "Chamado", "Solicitante", "Departamento"];
 
@@ -35,9 +35,9 @@ const MOVEMENT_TYPE_COLORS: Record<string, string> = {
   outros: "bg-purple-50 text-purple-700 border-purple-200",
 };
 
-type EquipmentMovementWithUnit = {
+type EquipmentMovementWithItem = {
   id: number;
-  unitId: number;
+  itemId: number;
   type: string;
   previousUser: string | null;
   previousDepartment: string | null;
@@ -47,14 +47,14 @@ type EquipmentMovementWithUnit = {
   notes: string | null;
   performedBy: string | null;
   createdAt: string | null;
-  unit: EquipmentUnit;
+  item: Item;
 };
 
 export default function TransactionsPage() {
   const { data: transactions = [], isLoading } = useTransactions();
   const [eqSearch, setEqSearch] = useState("");
 
-  const { data: eqMovements = [], isLoading: eqLoading } = useQuery<EquipmentMovementWithUnit[]>({
+  const { data: eqMovements = [], isLoading: eqLoading } = useQuery<EquipmentMovementWithItem[]>({
     queryKey: ["/api/equipment-movements"],
   });
 
@@ -66,8 +66,8 @@ export default function TransactionsPage() {
     const s = eqSearch.toLowerCase();
     return (
       !s ||
-      m.unit?.name?.toLowerCase().includes(s) ||
-      m.unit?.serialNumber?.toLowerCase().includes(s) ||
+      m.item?.name?.toLowerCase().includes(s) ||
+      m.item?.serialNumber?.toLowerCase().includes(s) ||
       (m.newUser ?? "").toLowerCase().includes(s) ||
       (m.previousUser ?? "").toLowerCase().includes(s) ||
       (m.ticketNumber ?? "").toLowerCase().includes(s) ||
@@ -91,8 +91,8 @@ export default function TransactionsPage() {
   const eqRows = () =>
     filteredEqMovements.map((m) => [
       m.createdAt ? format(new Date(m.createdAt), "dd/MM/yyyy HH:mm", { locale: ptBR }) : "",
-      m.unit?.name ?? "",
-      m.unit?.serialNumber ?? "",
+      m.item?.name ?? "",
+      m.item?.serialNumber ?? "",
       MOVEMENT_TYPE_LABELS[m.type] ?? m.type,
       m.previousUser ?? "",
       m.newUser ?? "",
@@ -258,11 +258,11 @@ export default function TransactionsPage() {
                             {m.createdAt ? format(new Date(m.createdAt), "dd/MM/yyyy HH:mm", { locale: ptBR }) : "—"}
                           </td>
                           <td className="px-6 py-4">
-                            <p className="font-semibold text-slate-800 text-sm">{m.unit?.name ?? "—"}</p>
-                            {m.unit?.model && <p className="text-xs text-slate-400">{m.unit.model}</p>}
+                            <p className="font-semibold text-slate-800 text-sm">{m.item?.name ?? "—"}</p>
+                            {m.item?.model && <p className="text-xs text-slate-400">{m.item.model}</p>}
                           </td>
                           <td className="px-6 py-4 font-mono text-xs text-slate-600">
-                            {m.unit?.serialNumber ?? "—"}
+                            {m.item?.serialNumber ?? "—"}
                           </td>
                           <td className="px-6 py-4">
                             <Badge variant="outline" className={`text-xs ${MOVEMENT_TYPE_COLORS[m.type] ?? "bg-slate-50 text-slate-600 border-slate-200"}`}>
