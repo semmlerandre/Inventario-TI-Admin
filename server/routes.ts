@@ -586,9 +586,31 @@ export async function registerRoutes(
   app.post("/api/equipment-movements", requireAuth, async (req, res) => {
     try {
       const data = insertEquipmentMovementSchema.parse(req.body);
+
       const movement = await storage.createEquipmentMovement(data);
+
+      const statusMap: Record<string, string> = {
+        nova_contratacao: "em_uso",
+        transferencia: "em_uso",
+        retorno_estoque: "em_estoque",
+        manutencao: "em_manutencao",
+        devolucao_fornecedor: "devolvido_fornecedor",
+        descarte: "descartado",
+      };
+
+      const newStatus = statusMap[data.type];
+
+      if (newStatus) {
+        await storage.updateItem(data.itemId, {
+          eqStatus: newStatus,
+        });
+      }
+
       res.status(201).json(movement);
-    } catch (e: any) { res.status(400).json({ message: e.message }); }
+
+    } catch (e: any) {
+      res.status(400).json({ message: e.message });
+    }
   });
 
   // Init seed

@@ -4,38 +4,42 @@ FROM node:20-slim AS builder
 WORKDIR /app
 
 COPY package*.json ./
-RUN npm install
+
+ENV NODE_ENV=development
+
+RUN npm install --production=false
+
+RUN npm rebuild
 
 COPY . .
+
 RUN npm run build
 
 
 # ---------- PRODUCTION STAGE ----------
-FROM node:20-slim
+FROM node:20-slim AS production
 
 WORKDIR /app
 
-# 🔥 Instala dependências necessárias (pg_isready + nc)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     netcat-openbsd \
     postgresql-client \
     && rm -rf /var/lib/apt/lists/*
 
-# Instala apenas dependências de produção
 COPY package*.json ./
-RUN npm install --omit=dev
-
-# Copia build
-COPY --from=builder /app/dist ./dist
-
-# Cria pasta de uploads
-RUN mkdir -p /app/uploads
-
-# Copia entrypoint
-COPY entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
 
 ENV NODE_ENV=production
+
+RUN npm ci --omit=dev
+
+COPY --from=builder /app/dist ./dist
+
+RUN mkdir -p /app/uploads
+
+COPY entrypoint.sh /entrypoint.sh
+
+RUN chmod +x /entrypoint.sh
+
 ENV PORT=5000
 
 EXPOSE 5000

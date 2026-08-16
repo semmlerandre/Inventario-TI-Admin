@@ -11,6 +11,7 @@ import NotFound from "@/pages/not-found";
 import AuthPage from "./pages/auth";
 import DashboardPage from "./pages/dashboard";
 import InventoryPage from "./pages/inventory";
+import AssetsPage from "./pages/assets";
 import TransactionsPage from "./pages/transactions";
 import SettingsPage from "./pages/settings";
 
@@ -55,6 +56,10 @@ function Router() {
       </Route>
       <Route path="/estoque">
         <ProtectedRoute component={InventoryPage} />
+      </Route>
+
+      <Route path="/ativos">
+        <ProtectedRoute component={AssetsPage} />
       </Route>
       <Route path="/movimentacoes">
         <ProtectedRoute component={TransactionsPage} />

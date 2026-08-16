@@ -43,6 +43,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
   const navItems = [
     { href: "/", label: "Dashboard", icon: LayoutDashboard },
     { href: "/estoque", label: "Estoque", icon: Package },
+    { href: "/ativos", label: "Ativos TI", icon: Cpu },
     { href: "/movimentacoes", label: "Movimentações", icon: ArrowLeftRight },
     ...(user?.isAdmin ? [{ href: "/configuracoes", label: "Configurações", icon: Settings }] : []),
   ];

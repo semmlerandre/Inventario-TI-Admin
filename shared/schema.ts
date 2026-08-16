@@ -12,6 +12,15 @@ export const users = pgTable("users", {
   mustChangePassword: boolean("must_change_password").notNull().default(false),
 });
 
+
+// ==================== SESSAO EXPRESS ====================
+
+export const session = pgTable("session", {
+  sid: text("sid").primaryKey(),
+  sess: text("sess").notNull(),
+  expire: timestamp("expire").notNull(),
+});
+
 export const settings = pgTable("settings", {
   id: serial("id").primaryKey(),
   logoUrl: text("logo_url"),
@@ -32,22 +41,42 @@ export const settings = pgTable("settings", {
 
 export const items = pgTable("items", {
   id: serial("id").primaryKey(),
+
   name: text("name").notNull(),
   category: text("category").notNull(),
+  equipmentType: text("equipment_type"),
+
+  assetTag: text("asset_tag"),
+  manufacturer: text("manufacturer"),
+  model: text("model"),
+  serialNumber: text("serial_number"),
+  hostname: text("hostname"),
+
+  cpu: text("cpu"),
+  ram: text("ram"),
+  storage: text("storage"),
+  operatingSystem: text("operating_system"),
+
+  ownership: text("ownership"),
+  supplier: text("supplier"),
+  invoiceNumber: text("invoice_number"),
+  purchaseValue: numeric("purchase_value", {
+    precision: 10,
+    scale: 2
+  }),
+
+  purchaseDate: timestamp("purchase_date"),
+  warrantyExpiration: timestamp("warranty_expiration"),
+
   stock: integer("stock").notNull().default(0),
   minStock: integer("min_stock").notNull().default(5),
-  createdAt: timestamp("created_at").defaultNow(),
-  // Campos adicionais por categoria
-  hostname: text("hostname"),
-  model: text("model"),
-  supplier: text("supplier"),
-  serialNumber: text("serial_number"),
-  equipmentType: text("equipment_type"),
-  ownership: text("ownership"), // 'proprio' | 'alugado'
-  // Rastreio de equipamentos (Hardware)
+
   currentHolder: text("current_holder"),
   currentDepartment: text("current_department"),
-  eqStatus: text("eq_status").default("em_estoque"), // em_estoque | em_uso | em_manutencao | descartado
+
+  eqStatus: text("eq_status").default("em_estoque"),
+
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
 export const transactions = pgTable("transactions", {
@@ -71,6 +100,7 @@ export const transactionsRelations = relations(transactions, ({ one }) => ({
 export const itemsRelations = relations(items, ({ many }) => ({
   transactions: many(transactions),
 }));
+
 
 // ==================== TELEFONIA MÓVEL ====================
 

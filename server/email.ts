@@ -95,3 +95,122 @@ export async function sendDomainAlert(opts: DomainAlertOptions) {
 
   console.log(`[EMAIL-DOMAIN] Enviado: ${subject} → ${opts.to}`);
 }
+
+
+export interface LowStockAlertOptions {
+  to: string;
+  itemName: string;
+  currentStock: number;
+  minimumStock: number;
+  supplier?: string;
+}
+
+
+export async function sendLowStockAlert(opts: LowStockAlertOptions) {
+
+  const settings = await storage.getSettings();
+
+  if (!settings?.smtpHost || !settings?.smtpUser || !settings?.smtpPass) {
+    console.log("[EMAIL-STOCK] SMTP não configurado.");
+    return;
+  }
+
+
+  const transporter = nodemailer.createTransport({
+    host: settings.smtpHost,
+    port: settings.smtpPort || 587,
+    secure: settings.smtpPort === 465,
+    auth: {
+      user: settings.smtpUser,
+      pass: settings.smtpPass,
+    },
+  });
+
+
+  const appName = settings.appName || "TI Inventory";
+
+
+  const subject = `⚠️ Estoque baixo - ${opts.itemName}`;
+
+
+  const html = `
+<html>
+<body style="font-family:Segoe UI,sans-serif;background:#f7fafc;padding:20px">
+
+<div style="max-width:600px;margin:auto;background:white;padding:30px;border-radius:12px">
+
+<h2 style="color:#c53030">
+⚠️ Alerta de Estoque Baixo
+</h2>
+
+<p>
+O item abaixo atingiu o limite mínimo configurado.
+</p>
+
+
+<table style="width:100%;border-collapse:collapse">
+
+<tr>
+<td><b>Produto</b></td>
+<td>${opts.itemName}</td>
+</tr>
+
+<tr>
+<td><b>Estoque atual</b></td>
+<td>${opts.currentStock}</td>
+</tr>
+
+
+<tr>
+<td><b>Estoque mínimo</b></td>
+<td>${opts.minimumStock}</td>
+</tr>
+
+
+<tr>
+<td><b>Fornecedor</b></td>
+<td>${opts.supplier || "-"}</td>
+</tr>
+
+
+</table>
+
+
+<p style="margin-top:30px;color:#718096">
+${appName} - Sistema de Gestão de TI
+</p>
+
+</div>
+
+</body>
+</html>
+`;
+
+
+  await transporter.sendMail({
+
+    from: `"${appName}" <${settings.smtpUser}>`,
+
+    to: opts.to,
+
+    subject,
+
+    html,
+
+    text:
+`${subject}
+
+Produto: ${opts.itemName}
+Estoque atual: ${opts.currentStock}
+Estoque mínimo: ${opts.minimumStock}
+Fornecedor: ${opts.supplier || "-"}
+`
+
+  });
+
+
+  console.log(
+    `[EMAIL-STOCK] Enviado: ${opts.itemName} → ${opts.to}`
+  );
+
+}

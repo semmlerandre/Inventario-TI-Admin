@@ -5,26 +5,33 @@ import { useToast } from "@/hooks/use-toast";
 import { applyThemeColor } from "@/lib/color-utils";
 
 function updateFavicon(logoData: string | null | undefined) {
-  if (!logoData) {
-    // Reset to default favicon
-    const link = document.querySelector("link[rel='icon']") as HTMLLinkElement;
-    if (link) {
-      link.href = "/favicon.png";
-    }
-    return;
-  }
-  
-  // Update favicon with the logo image
-  let link = document.querySelector("link[rel='icon']") as HTMLLinkElement;
+  let link = document.querySelector("#app-favicon") as HTMLLinkElement;
+
   if (!link) {
     link = document.createElement("link");
+    link.id = "app-favicon";
     link.rel = "icon";
     document.head.appendChild(link);
   }
-  
+
+  if (!logoData) {
+    link.type = "image/svg+xml";
+    link.href =
+      "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1' height='1'%3E%3C/svg%3E";
+    return;
+  }
+
   link.type = "image/png";
   link.href = logoData;
 }
+
+function updateDocumentTitle(appName: string | null | undefined) {
+  document.title = appName || "IT Inventory";
+}
+
+
+
+
 
 export function useSettings() {
   return useQuery({
@@ -37,6 +44,10 @@ export function useSettings() {
       // Inject theme color on fetch
       if (data?.primaryColor) {
         applyThemeColor(data.primaryColor);
+      }
+
+      if (data?.appName) {
+        updateDocumentTitle(data.appName);
       }
       
       // Update favicon on fetch
@@ -67,7 +78,8 @@ export function useUpdateSettings() {
     onSuccess: (data) => {
       queryClient.setQueryData([api.settings.get.path], data);
       if (data.primaryColor) applyThemeColor(data.primaryColor);
-      if (data.logoData) updateFavicon(data.logoData);
+      updateFavicon(data.logoData);
+      if (data.appName) updateDocumentTitle(data.appName);
       toast({ title: "Configurações salvas!" });
     },
     onError: () => {

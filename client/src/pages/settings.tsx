@@ -59,7 +59,7 @@ function UserManagement() {
               </p>
               <p className="text-xs text-slate-500">{u.isActive ? "Ativo" : "Bloqueado"}</p>
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <Button 
                 variant="outline" 
                 size="sm" 
@@ -256,6 +256,36 @@ export default function SettingsPage() {
     }
   };
 
+
+  const restoreDefaults = () => {
+    const confirmReset = window.confirm(
+      "Restaurar configurações padrão?\n\n" +
+      "O sistema voltará para a configuração original.\n\n" +
+      "O nome, logo, favicon e cores personalizados serão removidos."
+    );
+
+    if (!confirmReset) return;
+
+    updateSettings.mutate({
+      appName: "IT Inventory",
+      logoUrl: "",
+      logoData: "",
+      primaryColor: "#0ea5e9",
+      alertEmail: settings?.alertEmail || "",
+      alertStockLevel: 5,
+      smtpHost: settings?.smtpHost || "",
+      smtpPort: 587,
+      smtpUser: settings?.smtpUser || "",
+      smtpPass: "",
+      webhookTeams: "",
+      webhookSlack: "",
+      loginBackgroundUrl: "",
+      loginBackgroundData: "",
+    });
+  };
+
+
+
   if (isLoading) return <AppLayout><div className="p-8">Carregando...</div></AppLayout>;
 
   const currentColor = settingsForm.watch("primaryColor");
@@ -347,7 +377,7 @@ export default function SettingsPage() {
                             )}
                           </div>
                           <div className="flex-1 space-y-2">
-                            <div className="flex gap-2">
+                            <div className="flex flex-wrap gap-2">
                               <Button 
                                 type="button" 
                                 variant="outline" 
@@ -528,9 +558,24 @@ export default function SettingsPage() {
                       <FormMessage />
                     </FormItem>
                   )} />
-                  <Button type="submit" className="w-full" disabled={updateSettings.isPending}>
-                    Salvar Alterações
-                  </Button>
+                    <div className="flex gap-3 pt-4 border-t">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="flex-1"
+                        onClick={restoreDefaults}
+                      >
+                        Restaurar padrão
+                      </Button>
+
+                      <Button
+                        type="submit"
+                        className="flex-1"
+                        disabled={updateSettings.isPending}
+                      >
+                        Salvar Alterações
+                      </Button>
+                    </div>
                 </form>
               </Form>
             </CardContent>

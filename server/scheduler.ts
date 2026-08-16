@@ -1,7 +1,7 @@
 import cron from "node-cron";
 import { storage } from "./storage";
 import { checkSSL, daysUntil } from "./ssl-checker";
-import { sendDomainAlert } from "./email";
+import { sendDomainAlert, sendLowStockAlert } from "./email";
 
 // Intervalos de alerta em dias (verifica do menor para o maior)
 const ALERT_INTERVALS = [30, 60, 90];
@@ -120,6 +120,78 @@ async function runDomainChecks() {
   console.log(`[Scheduler] Verificação concluída. ${alertsEnviados} alerta(s) enviado(s).`);
 }
 
+
+
+async function runStockChecks() {
+
+  console.log("[Scheduler] Iniciando verificação de estoque...");
+
+  try {
+
+    const settings = await storage.getSettings();
+
+    if (!settings?.alertEmail) {
+      console.log("[Scheduler] Email de alerta de estoque não configurado.");
+      return;
+    }
+
+
+    const items = await storage.getItems();
+
+
+    const lowStockItems = items.filter(
+      item =>
+        item.stock <= item.minStock
+    );
+
+
+    if (lowStockItems.length === 0) {
+      console.log("[Scheduler] Nenhum item com estoque baixo.");
+      return;
+    }
+
+
+    console.log(
+      `[Scheduler] ${lowStockItems.length} item(ns) abaixo do estoque mínimo.`
+    );
+
+
+    for (const item of lowStockItems) {
+
+      try {
+
+        await sendLowStockAlert({
+          to: settings.alertEmail,
+          itemName: item.name,
+          currentStock: item.stock,
+          minimumStock: item.minStock,
+          supplier: item.supplier ?? undefined,
+        });
+
+
+      } catch (e: any) {
+
+        console.error(
+          `[Scheduler] Erro ao enviar alerta de estoque ${item.name}:`,
+          e.message
+        );
+
+      }
+
+    }
+
+
+  } catch (e: any) {
+
+    console.error(
+      "[Scheduler] Erro na verificação de estoque:",
+      e.message
+    );
+
+  }
+
+}
+
 export function startScheduler() {
   // ── Verificação na inicialização do servidor ──────────────────
   // Aguarda 20s para garantir que o banco de dados está pronto
@@ -127,6 +199,7 @@ export function startScheduler() {
     console.log("[Scheduler] Executando verificação inicial ao iniciar o servidor...");
     try {
       await runDomainChecks();
+      await runStockChecks();
     } catch (e: any) {
       console.error("[Scheduler] Erro na verificação inicial:", e.message);
     }
@@ -136,6 +209,7 @@ export function startScheduler() {
   cron.schedule("0 8 * * *", async () => {
     try {
       await runDomainChecks();
+      await runStockChecks();
     } catch (e: any) {
       console.error("[Scheduler] Erro na verificação diária:", e.message);
     }
@@ -146,6 +220,7 @@ export function startScheduler() {
   cron.schedule("0 20 * * *", async () => {
     try {
       await runDomainChecks();
+      await runStockChecks();
     } catch (e: any) {
       console.error("[Scheduler] Erro na verificação noturna:", e.message);
     }
