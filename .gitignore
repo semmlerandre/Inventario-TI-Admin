@@ -4,3 +4,11 @@ dist
 server/public
 vite.config.ts.*
 *.tar.gz
+# Configuracao local / producao
+.env
+.env.*
+
+# Backups locais
+*.bkp
+backups/
+*.bkp*
