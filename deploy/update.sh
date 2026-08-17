@@ -132,7 +132,7 @@ check_worktree() {
 
     local changes
 
-    changes="$(git status --porcelain --untracked-files=no)"
+    changes="$(git status --porcelain --untracked-files=normal)"
 
     if [ -n "$changes" ]; then
         echo
@@ -195,9 +195,12 @@ fetch_update() {
 update_source() {
     log "INFO" "Atualizando código-fonte..."
 
-    # Vai diretamente para o commit publicado em origin/main.
-    # Não usamos reset --hard.
-    git switch --detach "$TARGET_COMMIT" ||
+    # Mantém a instalação em uma branch local própria de produção,
+    # apontando exatamente para o commit publicado em origin/main.
+    #
+    # O check_worktree executado anteriormente garante que não existam
+    # alterações locais ou arquivos não rastreados antes desta operação.
+    git switch -C production "$TARGET_COMMIT" ||
         fail "Não foi possível trocar para a nova versão."
 
     log "OK" "Código atualizado para ${TARGET_COMMIT}."
