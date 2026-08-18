@@ -637,25 +637,4 @@ async function seedDatabase() {
     });
   }
 
-  const items = await storage.getItems();
-  if (items.length === 0) {
-    await storage.createItem({
-      name: "Mouse Sem Fio Logitech",
-      category: "Periféricos",
-      stock: 12,
-      minStock: 5,
-    });
-    await storage.createItem({
-      name: "Teclado Mecânico Redragon",
-      category: "Periféricos",
-      stock: 4,
-      minStock: 5,
-    });
-    await storage.createItem({
-      name: "Monitor Dell 24",
-      category: "Monitores",
-      stock: 8,
-      minStock: 3,
-    });
-  }
 }
